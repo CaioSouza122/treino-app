@@ -49,3 +49,20 @@ Thumbs.db
 
 # Generated Excel exports
 *.xlsx
+
+# Databases
+*.db
+*.sqlite
+
+# IDEs and editors
+.vscode/
+.idea/
+.project
+.classpath
+.settings/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+

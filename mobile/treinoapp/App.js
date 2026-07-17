@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,17 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
 
+const FILE_PATH = FileSystem.documentDirectory + 'treino_ai_data.json';
+
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function App() {
+  const [userId, setUserId] = useState('');
   const [objetivo, setObjetivo] = useState('');
   const [idade, setIdade] = useState('');
   const [peso, setPeso] = useState('');
@@ -25,8 +35,83 @@ export default function App() {
   const [frequencia, setFrequencia] = useState('');
   const [tempo, setTempo] = useState(30); // Define 30 min como padrao do slider
   
+  // URL da API customizável (com padrão baseado no ambiente)
+  const [backendUrl, setBackendUrl] = useState(
+    Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000'
+  );
+  const [apiKey, setApiKey] = useState('');
+  const [mostrarConfig, setMostrarConfig] = useState(false);
+  const [historico, setHistorico] = useState([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [exibirHistorico, setExibirHistorico] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [treino, setTreino] = useState(null);
+
+  // Carrega configurações e dados do usuário salvos localmente
+  useEffect(() => {
+    const carregarDadosLocais = async () => {
+      try {
+        let dadosString = null;
+        if (Platform.OS === 'web') {
+          dadosString = window.localStorage.getItem('treino_ai_data');
+        } else {
+          const info = await FileSystem.getInfoAsync(FILE_PATH);
+          if (info.exists) {
+            dadosString = await FileSystem.readAsStringAsync(FILE_PATH);
+          }
+        }
+
+        if (dadosString) {
+          const dados = JSON.parse(dadosString);
+          if (dados.userId) setUserId(dados.userId);
+          if (dados.objetivo) setObjetivo(dados.objetivo);
+          if (dados.idade) setIdade(dados.idade.toString());
+          if (dados.peso) setPeso(dados.peso.toString());
+          if (dados.altura) setAltura(dados.altura.toString());
+          if (dados.frequencia) setFrequencia(dados.frequencia.toString());
+          if (dados.tempo) setTempo(Number(dados.tempo));
+          if (dados.backendUrl) setBackendUrl(dados.backendUrl);
+          if (dados.apiKey) setApiKey(dados.apiKey);
+          if (dados.treino) setTreino(dados.treino);
+        } else {
+          // Primeira execução: gera um ID único para o usuário
+          setUserId(generateUUID());
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar dados locais:', error);
+        setUserId(generateUUID());
+      }
+    };
+
+    carregarDadosLocais();
+  }, []);
+
+  // Salva dados fisicos do usuário e configurações localmente
+  const salvarDadosLocais = async (dadosNovos) => {
+    try {
+      const dadosParaSalvar = {
+        userId: dadosNovos.userId || userId || generateUUID(),
+        objetivo: dadosNovos.objetivo ?? objetivo,
+        idade: dadosNovos.idade ?? idade,
+        peso: dadosNovos.peso ?? peso,
+        altura: dadosNovos.altura ?? altura,
+        frequencia: dadosNovos.frequencia ?? frequencia,
+        tempo: dadosNovos.tempo ?? tempo,
+        backendUrl: dadosNovos.backendUrl ?? backendUrl,
+        apiKey: dadosNovos.apiKey ?? apiKey,
+        treino: dadosNovos.treino !== undefined ? dadosNovos.treino : treino,
+      };
+
+      if (Platform.OS === 'web') {
+        window.localStorage.setItem('treino_ai_data', JSON.stringify(dadosParaSalvar));
+      } else {
+        await FileSystem.writeAsStringAsync(FILE_PATH, JSON.stringify(dadosParaSalvar));
+      }
+    } catch (error) {
+      console.warn('Erro ao salvar dados locais:', error);
+    }
+  };
 
   // Gerador de treino local (funciona sem servidor)
   const gerarTreinoLocal = () => {
@@ -74,45 +159,94 @@ export default function App() {
     if (!objetivo.trim() || !frequencia.trim()) return;
     setLoading(true);
 
+    const dadosEnvio = {
+      user_id: userId || generateUUID(),
+      objetivo,
+      idade: Number(idade) || 25,
+      peso: Number(peso) || 70,
+      altura: Number(altura) || 170,
+      vezes_por_semana: Number(frequencia),
+      tempo,
+      nivel: 'intermediario',
+    };
+
     try {
-      // Tenta o backend com timeout de 5 segundos
-      const ipApi = Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
-
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-      const response = await fetch(`${ipApi}/gerar-treino-ia`, {
+      const response = await fetch(`${backendUrl}/gerar-treino-ia`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Treino-Key': apiKey,
+        },
         signal: controller.signal,
-        body: JSON.stringify({
-          objetivo,
-          idade: Number(idade),
-          peso: Number(peso),
-          altura: Number(altura),
-          vezes_por_semana: Number(frequencia),
-          tempo,
-          nivel: 'intermediario',
-        }),
+        body: JSON.stringify(dadosEnvio),
       });
       clearTimeout(timeoutId);
 
       const data = await response.json();
-
       if (!response.ok) throw new Error(data.detail || 'Erro na API');
 
       const lista = Array.isArray(data) ? data : (data.treino || []);
       if (lista.length > 0) {
         setTreino(lista);
+        salvarDadosLocais({
+          userId: dadosEnvio.user_id,
+          treino: lista,
+        });
         return;
       }
       throw new Error('Resposta vazia');
-    } catch (_) {
+    } catch (error) {
+      console.warn('Conectando ao fallback local devido a:', error.message);
       // Servidor não disponível ou erro — usa o gerador local
-      setTreino(gerarTreinoLocal());
+      const treinoGeradoLocal = gerarTreinoLocal();
+      setTreino(treinoGeradoLocal);
+      salvarDadosLocais({
+        userId: dadosEnvio.user_id,
+        treino: treinoGeradoLocal,
+      });
+      Alert.alert(
+        'Modo Offline/Fallback',
+        'Não foi possível conectar à API. Um treino padrão foi gerado localmente e salvo no seu perfil.'
+      );
     } finally {
       setLoading(false);
     }
+  };
+
+  const carregarHistorico = async () => {
+    if (!userId) return;
+    setLoadingHistorico(true);
+    try {
+      const response = await fetch(`${backendUrl}/historico/${userId}`, {
+        headers: {
+          'X-Treino-Key': apiKey,
+        }
+      });
+      if (!response.ok) throw new Error('Não foi possível carregar o histórico');
+      const data = await response.json();
+      setHistorico(data);
+      setExibirHistorico(true);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível buscar seu histórico do servidor Neon: ' + error.message);
+    } finally {
+      setLoadingHistorico(false);
+    }
+  };
+
+  const selecionarTreinoHistorico = (treinoHistorico) => {
+    // Converte os dados do histórico para o formato da UI
+    const treinoFormatado = treinoHistorico.days.map(d => ({
+      dia: d.dia,
+      foco: d.foco,
+      exercicios: d.exercicios,
+    }));
+    setTreino(treinoFormatado);
+    setExibirHistorico(false);
+    salvarDadosLocais({ treino: treinoFormatado });
+    Alert.alert('Sucesso', 'Treino antigo carregado no perfil!');
   };
 
   const limparTreino = () => {
@@ -123,22 +257,27 @@ export default function App() {
     setAltura('');
     setFrequencia('');
     setTempo(30);
+    salvarDadosLocais({
+      objetivo: '',
+      idade: '',
+      peso: '',
+      altura: '',
+      frequencia: '',
+      tempo: 30,
+      treino: null,
+    });
   };
 
   const exportarExcel = async () => {
     try {
       const workbook = XLSX.utils.book_new();
-
-      // ---- Aba única: Treino Completo ----
       const planilha = [];
 
-      // Título
       planilha.push(['🏋️ TREINO SEMANAL - TREINO.AI', '', '']);
       planilha.push(['Objetivo', objetivo, '']);
       planilha.push(['Frequência', `${frequencia}x por semana`, `Tempo por sessão: ${tempo} min`]);
       planilha.push(['', '', '']);
 
-      // Exercícios por dia
       treino.forEach((dia) => {
         planilha.push([dia.dia.toUpperCase(), dia.foco, '']);
         planilha.push(['Exercício', '', '']);
@@ -147,7 +286,6 @@ export default function App() {
         planilha.push(['', '', '']);
       });
 
-      // Perfil completo ao final
       planilha.push(['── PERFIL DO USUÁRIO ──', '', '']);
       planilha.push(['Idade', `${idade} anos`, '']);
       planilha.push(['Peso', `${peso} kg`, '']);
@@ -158,7 +296,6 @@ export default function App() {
       XLSX.utils.book_append_sheet(workbook, ws, 'Treino Semanal');
 
       if (Platform.OS === 'web') {
-        // Download direto via browser
         const wbout = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
         const blob = new Blob([wbout], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -172,7 +309,6 @@ export default function App() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
-        // Download nativo (celular)
         const wbout = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
         const filePath = FileSystem.documentDirectory + 'Treino_Semanal.xlsx';
         await FileSystem.writeAsStringAsync(filePath, wbout, {
@@ -191,7 +327,7 @@ export default function App() {
       }
     } catch (error) {
       console.error('Erro ao exportar:', error);
-      Alert.alert('Erro', 'Não foi possível exportar a planilha. Detalhe: ' + error.message);
+      Alert.alert('Erro', 'Não foi possível exportar a planilha: ' + error.message);
     }
   };
 
@@ -199,7 +335,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <StatusBar barStyle="light-content" backgroundColor="#1A1A2D" />
       
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
@@ -212,9 +348,104 @@ export default function App() {
         >
           {/* Cabeçalho */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Treino.AI</Text>
-            <Text style={styles.headerSubtitle}>Seu treino sob medida</Text>
+            <View style={styles.headerRow}>
+              <View>
+                <Text style={styles.headerTitle}>Treino.AI</Text>
+                <Text style={styles.headerSubtitle}>Seu treino sob medida</Text>
+              </View>
+              <View style={styles.headerButtons}>
+                <TouchableOpacity 
+                  style={styles.configButton} 
+                  onPress={() => setMostrarConfig(!mostrarConfig)}
+                >
+                  <Text style={styles.configButtonText}>⚙️</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Painel de Configurações */}
+            {mostrarConfig && (
+              <View style={styles.configPanel}>
+                <Text style={styles.configLabel}>IP / URL do Servidor API (Ex: http://192.168.1.50:8000)</Text>
+                <TextInput
+                  style={styles.configInput}
+                  placeholder="http://localhost:8000"
+                  placeholderTextColor="#8892b0"
+                  value={backendUrl}
+                  onChangeText={(text) => {
+                    setBackendUrl(text);
+                    salvarDadosLocais({ backendUrl: text });
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                
+                <Text style={styles.configLabel}>Chave da API (Opcional se configurado no servidor)</Text>
+                <TextInput
+                  style={styles.configInput}
+                  placeholder="Insira sua chave de API aqui"
+                  placeholderTextColor="#8892b0"
+                  value={apiKey}
+                  onChangeText={(text) => {
+                    setApiKey(text);
+                    salvarDadosLocais({ apiKey: text });
+                  }}
+                  secureTextEntry={true}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                
+                <Text style={styles.configHelp}>
+                  Seu ID único (PostgreSQL): <Text style={styles.uuidText}>{userId}</Text>
+                </Text>
+                <TouchableOpacity 
+                  style={styles.buttonHistory} 
+                  onPress={carregarHistorico}
+                  disabled={loadingHistorico}
+                >
+                  {loadingHistorico ? (
+                    <ActivityIndicator color="#FFD700" size="small" />
+                  ) : (
+                    <Text style={styles.buttonHistoryText}>☁️ Carregar Histórico do Neon</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
+
+          {/* Histórico Modal/View */}
+          {exibirHistorico && (
+            <View style={styles.historicoContainer}>
+              <View style={styles.historicoHeader}>
+                <Text style={styles.historicoTitle}>Seus Treinos Salvos (Neon.tech)</Text>
+                <TouchableOpacity onPress={() => setExibirHistorico(false)}>
+                  <Text style={styles.closeText}>Fechar ✕</Text>
+                </TouchableOpacity>
+              </View>
+              {historico.length === 0 ? (
+                <Text style={styles.historicoVazio}>Nenhum treino salvo encontrado no servidor.</Text>
+              ) : (
+                historico.map((h, i) => (
+                  <View key={i} style={styles.historicoCard}>
+                    <View>
+                      <Text style={styles.historicoCardDate}>
+                        Salvo em: {new Date(h.created_at).toLocaleDateString('pt-BR')} às {new Date(h.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      <Text style={styles.historicoCardDetails}>
+                        {h.days.length} sessões divididas
+                      </Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.historicoLoadBtn} 
+                      onPress={() => selecionarTreinoHistorico(h)}
+                    >
+                      <Text style={styles.historicoLoadBtnText}>Carregar</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
 
           {/* Área de Entrada */}
           {!treino ? (
@@ -227,7 +458,10 @@ export default function App() {
                 multiline
                 numberOfLines={3}
                 value={objetivo}
-                onChangeText={setObjetivo}
+                onChangeText={(text) => {
+                  setObjetivo(text);
+                  salvarDadosLocais({ objetivo: text });
+                }}
               />
 
               <View style={styles.row}>
@@ -239,7 +473,10 @@ export default function App() {
                     placeholderTextColor="#9ca3af"
                     keyboardType="numeric"
                     value={idade}
-                    onChangeText={setIdade}
+                    onChangeText={(text) => {
+                      setIdade(text);
+                      salvarDadosLocais({ idade: text });
+                    }}
                   />
                 </View>
                 <View style={[styles.inputGroup, { marginLeft: 15 }]}>
@@ -250,7 +487,10 @@ export default function App() {
                     placeholderTextColor="#9ca3af"
                     keyboardType="numeric"
                     value={peso}
-                    onChangeText={setPeso}
+                    onChangeText={(text) => {
+                      setPeso(text);
+                      salvarDadosLocais({ peso: text });
+                    }}
                   />
                 </View>
               </View>
@@ -264,7 +504,10 @@ export default function App() {
                     placeholderTextColor="#9ca3af"
                     keyboardType="numeric"
                     value={altura}
-                    onChangeText={setAltura}
+                    onChangeText={(text) => {
+                      setAltura(text);
+                      salvarDadosLocais({ altura: text });
+                    }}
                   />
                 </View>
                 <View style={[styles.inputGroup, { marginLeft: 15 }]}>
@@ -275,7 +518,10 @@ export default function App() {
                     placeholderTextColor="#9ca3af"
                     keyboardType="numeric"
                     value={frequencia}
-                    onChangeText={setFrequencia}
+                    onChangeText={(text) => {
+                      setFrequencia(text);
+                      salvarDadosLocais({ frequencia: text });
+                    }}
                   />
                 </View>
               </View>
@@ -285,7 +531,11 @@ export default function App() {
                 <View style={styles.timeSelector}>
                   <TouchableOpacity 
                     style={styles.timeButton}
-                    onPress={() => setTempo(prev => Math.max(15, prev - 5))}
+                    onPress={() => {
+                      const novo = Math.max(15, tempo - 5);
+                      setTempo(novo);
+                      salvarDadosLocais({ tempo: novo });
+                    }}
                   >
                     <Text style={styles.timeButtonText}>-</Text>
                   </TouchableOpacity>
@@ -297,7 +547,11 @@ export default function App() {
 
                   <TouchableOpacity 
                     style={styles.timeButton}
-                    onPress={() => setTempo(prev => Math.min(120, prev + 5))}
+                    onPress={() => {
+                      const novo = Math.min(120, tempo + 5);
+                      setTempo(novo);
+                      salvarDadosLocais({ tempo: novo });
+                    }}
                   >
                     <Text style={styles.timeButtonText}>+</Text>
                   </TouchableOpacity>
@@ -319,7 +573,7 @@ export default function App() {
           ) : (
             /* Área de Resultados */
             <View style={styles.resultSection}>
-              <Text style={styles.successTitle}>Treino Gerado!</Text>
+              <Text style={styles.successTitle}>Treino Ativo Gerado!</Text>
               <Text style={styles.successSubtitle}>Tempo Foco: {tempo} min | Frequência: {frequencia}x na semana</Text>
               
               {treino.map((diaInfo, index) => (
@@ -361,7 +615,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 24,
-    paddingTop: 40,
+    paddingTop: Platform.OS === 'ios' ? 20 : 40,
     backgroundColor: '#112240',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
@@ -371,6 +625,11 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
     marginBottom: 10,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     color: '#FFD700',
@@ -383,6 +642,127 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 5,
     fontWeight: '500',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+  },
+  configButton: {
+    backgroundColor: '#233554',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#495670',
+  },
+  configButtonText: {
+    fontSize: 22,
+  },
+  configPanel: {
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#233554',
+  },
+  configLabel: {
+    color: '#a8b2d1',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  configInput: {
+    backgroundColor: '#0a192f',
+    borderRadius: 10,
+    padding: 12,
+    color: '#e6f1ff',
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#495670',
+    marginBottom: 10,
+  },
+  configHelp: {
+    color: '#8892b0',
+    fontSize: 11,
+    marginBottom: 12,
+  },
+  uuidText: {
+    color: '#FFD700',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  buttonHistory: {
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.05)',
+  },
+  buttonHistoryText: {
+    color: '#FFD700',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  historicoContainer: {
+    margin: 20,
+    backgroundColor: '#112240',
+    borderRadius: 15,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  historicoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#233554',
+    paddingBottom: 10,
+  },
+  historicoTitle: {
+    color: '#e6f1ff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  closeText: {
+    color: '#ff6b6b',
+    fontWeight: 'bold',
+  },
+  historicoVazio: {
+    color: '#8892b0',
+    textAlign: 'center',
+    marginVertical: 10,
+  },
+  historicoCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#233554',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+  },
+  historicoCardDate: {
+    color: '#e6f1ff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  historicoCardDetails: {
+    color: '#a8b2d1',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  historicoLoadBtn: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  historicoLoadBtnText: {
+    color: '#0A192F',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   inputSection: {
     padding: 24,
@@ -456,7 +836,7 @@ const styles = StyleSheet.create({
     color: '#FFD700',
     fontSize: 28,
     fontWeight: 'bold',
-    marginTop: -4, // Ajuste ótico para o + e -
+    marginTop: -4,
   },
   timeValueContainer: {
     alignItems: 'center',
