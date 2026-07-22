@@ -42,11 +42,10 @@ export default function App() {
   const [backendUrl, setBackendUrl] = useState(
     Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000'
   );
-  const [apiKey, setApiKey] = useState('');
+  const [activeTab, setActiveTab] = useState('Home');
   
   // Modais e Navegação
   const [mostrarMenu, setMostrarMenu] = useState(false);
-  const [mostrarConfigRede, setMostrarConfigRede] = useState(false);
   const [exibirHistorico, setExibirHistorico] = useState(false);
   const [historico, setHistorico] = useState([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
@@ -77,7 +76,6 @@ export default function App() {
           if (dados.frequencia) setFrequencia(dados.frequencia.toString());
           if (dados.tempo) setTempo(Number(dados.tempo));
           if (dados.backendUrl) setBackendUrl(dados.backendUrl);
-          if (dados.apiKey) setApiKey(dados.apiKey);
           if (dados.treino) setTreino(dados.treino);
         } else {
           setUserId(generateUUID());
@@ -102,7 +100,6 @@ export default function App() {
         frequencia: dadosNovos.frequencia ?? frequencia,
         tempo: dadosNovos.tempo ?? tempo,
         backendUrl: dadosNovos.backendUrl ?? backendUrl,
-        apiKey: dadosNovos.apiKey ?? apiKey,
         treino: dadosNovos.treino !== undefined ? dadosNovos.treino : treino,
       };
 
@@ -114,39 +111,6 @@ export default function App() {
     } catch (error) {
       console.warn('Erro ao salvar dados locais:', error);
     }
-  };
-
-  const gerarTreinoLocal = () => {
-    const freq = Number(frequencia) || 3;
-    const letras = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
-    const obj = objetivo.toLowerCase();
-
-    const focos = obj.includes('perna') || obj.includes('inferior')
-      ? ['Pernas e Glúteos', 'Costas e Bíceps', 'Peito e Tríceps', 'Ombros e Core', 'Pernas (volume)', 'Cardio', 'Full Body']
-      : obj.includes('superior') || obj.includes('braço')
-      ? ['Peito e Tríceps', 'Costas e Bíceps', 'Ombros e Antebraço', 'Braços (isolados)', 'Full Body', 'Cardio', 'Core e Mobilidade']
-      : obj.includes('emagrec') || obj.includes('cardio')
-      ? ['Cardio + Core', 'Superiores Funcional', 'Inferiores Funcional', 'HIIT + Abdômen', 'Full Body Metabólico', 'Cardio Leve', 'Mobilidade']
-      : ['Peito e Tríceps', 'Costas e Bíceps', 'Pernas e Glúteos', 'Ombros e Core', 'Full Body', 'Cardio', 'Core e Mobilidade'];
-
-    const bases = {
-      'Peito e Tríceps': `Aquecimento: 5 min\nSupino Reto 4x10\nSupino Inclinado 3x12\nCrucifixo 3x12\nTríceps Polia 4x12\nTríceps Mergulho 3x15\nAbdômen Prancha 3x1min\n\nTempo estimado: ${tempo} min`,
-      'Costas e Bíceps': `Aquecimento: 5 min\nPuxada Frontal 4x10\nRemada Curvada 4x10\nRemada Unilateral 3x12\nRosca Direta 4x12\nRosca Martelo 3x12\nAbdômen Supra 3x20\n\nTempo estimado: ${tempo} min`,
-      'Pernas e Glúteos': `Aquecimento: 5 min\nAgachamento Livre 4x10\nLeg Press 4x12\nCadeira Extensora 3x15\nCadeira Flexora 3x15\nStiff 3x12\nPanturrilha em pé 4x15\n\nTempo estimado: ${tempo} min`,
-      'Ombros e Core': `Aquecimento: 5 min\nDesenvolvimento Halteres 4x10\nElevação Lateral 4x12\nElevação Frontal 3x12\nFace Pull 3x15\nPrancha 3x1min\nAbdômen Bicicleta 3x20\n\nTempo estimado: ${tempo} min`,
-      'Full Body': `Aquecimento: 5 min\nAgachamento 3x10\nSupino 3x10\nRemada 3x10\nDesenvolvimento 3x10\nRosca Direta 2x12\nTríceps 2x12\nPrancha 2x1min\n\nTempo estimado: ${tempo} min`,
-      'Cardio': `Aquecimento: 5 min caminhada\nEsteira (corrida leve) 15 min\nBike Ergométrica 10 min\nAbdômen Supra 3x20\nPrancha 3x1min\nAlongamento final: 5 min\n\nTempo estimado: ${tempo} min`,
-      'Core e Mobilidade': `Aquecimento: 5 min\nPrancha Frontal 4x1min\nPrancha Lateral 3x45s\nInfra Solo 4x15\nBicicleta 3x20\nSérie de Alongamentos 15 min\n\nTempo estimado: ${tempo} min`,
-    };
-
-    return Array.from({ length: freq }, (_, i) => {
-      const foco = focos[i % focos.length];
-      return {
-        dia: `Treino ${letras[i]}`,
-        foco: foco,
-        exercicios: bases[foco] || bases['Full Body'],
-      };
-    });
   };
 
   const gerarTreino = async () => {
@@ -166,13 +130,12 @@ export default function App() {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 40000);
 
       const response = await fetch(`${backendUrl}/gerar-treino-ia`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Treino-Key': apiKey,
         },
         signal: controller.signal,
         body: JSON.stringify(dadosEnvio),
@@ -193,16 +156,10 @@ export default function App() {
       }
       throw new Error('Resposta vazia');
     } catch (error) {
-      console.warn('Conectando ao fallback local devido a:', error.message);
-      const treinoGeradoLocal = gerarTreinoLocal();
-      setTreino(treinoGeradoLocal);
-      salvarDadosLocais({
-        userId: dadosEnvio.user_id,
-        treino: treinoGeradoLocal,
-      });
+      console.warn('Erro ao conectar à API:', error.message);
       Alert.alert(
-        'Modo Offline/Fallback',
-        'Não foi possível conectar à API. Um treino padrão foi gerado localmente e salvo no seu perfil.'
+        'Erro ao Gerar Treino',
+        'Não foi possível conectar à inteligência artificial. Verifique sua conexão e tente novamente.'
       );
     } finally {
       setLoading(false);
@@ -213,9 +170,7 @@ export default function App() {
     if (!userId) return;
     setLoadingHistorico(true);
     try {
-      const response = await fetch(`${backendUrl}/historico/${userId}`, {
-        headers: { 'X-Treino-Key': apiKey }
-      });
+      const response = await fetch(`${backendUrl}/historico/${userId}`);
       if (!response.ok) throw new Error('Não foi possível carregar o histórico');
       const data = await response.json();
       setHistorico(data);
@@ -368,19 +323,6 @@ export default function App() {
                 </View>
 
                 {/* Opções ajustadas com limite e sem sobras */}
-                <TouchableOpacity 
-                  style={styles.drawerItem}
-                  onPress={() => {
-                    setMostrarMenu(false);
-                    setMostrarConfigRede(true);
-                  }}
-                >
-                  <Ionicons name="wifi-sharp" size={20} color="#00FF66" style={{ marginRight: 10 }} />
-                  <View style={{ flexShrink: 1 }}>
-                    <Text style={styles.drawerItemText}>Configurações de Rede</Text>
-                    <Text style={styles.drawerItemSubtext}>Servidor API e Chaves</Text>
-                  </View>
-                </TouchableOpacity>
 
                 <TouchableOpacity 
                   style={styles.drawerItem}
@@ -399,59 +341,7 @@ export default function App() {
             </TouchableOpacity>
           </Modal>
 
-          {/* MODAL 1: Configurações de Rede */}
-          <Modal
-            visible={mostrarConfigRede}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setMostrarConfigRede(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Configurações de Rede</Text>
-                  <TouchableOpacity onPress={() => setMostrarConfigRede(false)}>
-                    <Ionicons name="close-circle" size={26} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
 
-                <ScrollView style={styles.modalBody}>
-                  <Text style={styles.configLabel}>IP / URL do Servidor API</Text>
-                  <TextInput
-                    style={styles.configInput}
-                    placeholder="http://localhost:8000"
-                    placeholderTextColor="#71717A"
-                    value={backendUrl}
-                    onChangeText={(text) => {
-                      setBackendUrl(text);
-                      salvarDadosLocais({ backendUrl: text });
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  
-                  <Text style={styles.configLabel}>Chave da API (Opcional)</Text>
-                  <TextInput
-                    style={styles.configInput}
-                    placeholder="Insira sua chave de API aqui"
-                    placeholderTextColor="#71717A"
-                    value={apiKey}
-                    onChangeText={(text) => {
-                      setApiKey(text);
-                      salvarDadosLocais({ apiKey: text });
-                    }}
-                    secureTextEntry={true}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  
-                  <Text style={styles.configHelp}>
-                    ID do Dispositivo: <Text style={styles.uuidText}>{userId}</Text>
-                  </Text>
-                </ScrollView>
-              </View>
-            </View>
-          </Modal>
 
           {/* MODAL 2: Meus Treinos Gerados */}
           <Modal
@@ -504,8 +394,10 @@ export default function App() {
             </View>
           </Modal>
 
-          {/* Formulário Principal */}
-          {!treino ? (
+          {/* Abas */}
+          {activeTab === 'Home' && (
+            <>
+              {!treino ? (
             <View style={styles.inputSection}>
               <Text style={styles.label}>Qual o seu objetivo?</Text>
               <TextInput
@@ -521,50 +413,7 @@ export default function App() {
                 }}
               />
 
-              <View style={styles.row}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.labelSmall}>Idade</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="25"
-                    placeholderTextColor="#71717A"
-                    keyboardType="numeric"
-                    value={idade}
-                    onChangeText={(text) => {
-                      setIdade(text);
-                      salvarDadosLocais({ idade: text });
-                    }}
-                  />
-                </View>
-                <View style={[styles.inputGroup, { marginLeft: 12 }]}>
-                  <Text style={styles.labelSmall}>Peso (kg)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="75"
-                    placeholderTextColor="#71717A"
-                    keyboardType="numeric"
-                    value={peso}
-                    onChangeText={(text) => {
-                      setPeso(text);
-                      salvarDadosLocais({ peso: text });
-                    }}
-                  />
-                </View>
-                <View style={[styles.inputGroup, { marginLeft: 12 }]}>
-                  <Text style={styles.labelSmall}>Altura (cm)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="175"
-                    placeholderTextColor="#71717A"
-                    keyboardType="numeric"
-                    value={altura}
-                    onChangeText={(text) => {
-                      setAltura(text);
-                      salvarDadosLocais({ altura: text });
-                    }}
-                  />
-                </View>
-              </View>
+              {/* Físicos foram movidos para a aba de Perfil */}
 
               {/* SELETOR RETRÁTIL DE DIAS (DROPDOWN) */}
               <View style={styles.daysContainer}>
@@ -679,9 +528,94 @@ export default function App() {
                 <Text style={styles.buttonOutlineText}>Ajustar Perfil</Text>
               </TouchableOpacity>
             </View>
+              )}
+            </>
+          )}
+
+          {activeTab === 'Perfil' && (
+            <View style={styles.inputSection}>
+              <Text style={styles.successTitle}>Meu Perfil</Text>
+              <Text style={styles.successSubtitle}>Informações físicas e de rede</Text>
+
+              <View style={styles.row}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.labelSmall}>Idade</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="25"
+                    placeholderTextColor="#71717A"
+                    keyboardType="numeric"
+                    value={idade}
+                    onChangeText={(text) => {
+                      setIdade(text);
+                      salvarDadosLocais({ idade: text });
+                    }}
+                  />
+                </View>
+                <View style={[styles.inputGroup, { marginLeft: 12 }]}>
+                  <Text style={styles.labelSmall}>Peso (kg)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="75"
+                    placeholderTextColor="#71717A"
+                    keyboardType="numeric"
+                    value={peso}
+                    onChangeText={(text) => {
+                      setPeso(text);
+                      salvarDadosLocais({ peso: text });
+                    }}
+                  />
+                </View>
+                <View style={[styles.inputGroup, { marginLeft: 12 }]}>
+                  <Text style={styles.labelSmall}>Altura (cm)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="175"
+                    placeholderTextColor="#71717A"
+                    keyboardType="numeric"
+                    value={altura}
+                    onChangeText={(text) => {
+                      setAltura(text);
+                      salvarDadosLocais({ altura: text });
+                    }}
+                  />
+                </View>
+              </View>
+            </View>
           )}
 
         </ScrollView>
+        
+        {/* BOTTOM TAB BAR */}
+        <View style={styles.tabBar}>
+          <TouchableOpacity 
+            style={styles.tabItem} 
+            onPress={() => setActiveTab('Home')}
+          >
+            <Ionicons 
+              name={activeTab === 'Home' ? "home" : "home-outline"} 
+              size={24} 
+              color={activeTab === 'Home' ? "#00FF66" : "#A1A1AA"} 
+            />
+            <Text style={[styles.tabText, activeTab === 'Home' && styles.tabTextActive]}>
+              Início
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.tabItem} 
+            onPress={() => setActiveTab('Perfil')}
+          >
+            <Ionicons 
+              name={activeTab === 'Perfil' ? "person" : "person-outline"} 
+              size={24} 
+              color={activeTab === 'Perfil' ? "#00FF66" : "#A1A1AA"} 
+            />
+            <Text style={[styles.tabText, activeTab === 'Perfil' && styles.tabTextActive]}>
+              Perfil
+            </Text>
+          </TouchableOpacity>
+        </View>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1087,5 +1021,29 @@ const styles = StyleSheet.create({
   buttonOutlineText: {
     color: '#A1A1AA',
     fontSize: 16,
+  },
+  // BOTTOM TAB BAR
+  tabBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#27272A',
+    backgroundColor: '#1A1A1A',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+    paddingTop: 10,
+  },
+  tabItem: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabText: {
+    fontSize: 12,
+    color: '#A1A1AA',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: '#00FF66',
+    fontWeight: 'bold',
   },
 });

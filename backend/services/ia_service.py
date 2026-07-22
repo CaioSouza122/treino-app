@@ -4,6 +4,7 @@ import hashlib
 import asyncio
 import httpx
 from datetime import datetime, timedelta
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,7 +18,7 @@ _cache = {}
 _cache_tempo = {}
 
 
-def gerar_treino_ia(dados, api_key_override=None):
+def gerar_treino_ia(dados):
     """
     Gera treino personalizado chamando a API Flask externa (que usa o Gemini internamente).
     Faz fallback para gerador local caso a API esteja inacessível.
@@ -30,27 +31,27 @@ def gerar_treino_ia(dados, api_key_override=None):
             print("📦 Usando resposta do cache")
             return _cache[chave]
 
-        resposta = _chamar_api_externa_sync(dados, api_key_override=api_key_override)
+        resposta = _chamar_api_externa_sync(dados)
 
         if resposta:
             _cache[chave] = resposta
             _cache_tempo[chave] = datetime.now() + timedelta(hours=1)
             return resposta
 
-        print("⚠️ API externa não respondeu corretamente. Usando fallback local.")
-        return _gerar_fallback(dados)
+        print("⚠️ API externa não respondeu corretamente.")
+        return None
 
     except Exception as e:
         print(f"❌ Erro geral: {e}")
-        return _gerar_fallback(dados)
+        return None
 
 
-def _chamar_api_externa_sync(dados, api_key_override=None):
+def _chamar_api_externa_sync(dados):
     """
     Chama o endpoint POST /api/v1/treino da API Flask do usuário de forma síncrona.
     """
     headers = {"Content-Type": "application/json"}
-    chave_api = api_key_override if api_key_override is not None else TREINO_API_KEY
+    chave_api = TREINO_API_KEY
     if chave_api:
         headers["X-API-KEY"] = chave_api
 
@@ -103,12 +104,12 @@ def _chamar_api_externa_sync(dados, api_key_override=None):
         return None
 
 
-async def testar_conexao_flask(api_key_override=None):
+async def testar_conexao_flask():
     """
     Testa a conexão com a API Flask e retorna um diagnóstico detalhado.
     """
     url = f"{TREINO_API_URL}/health"
-    chave_api = api_key_override if api_key_override is not None else TREINO_API_KEY
+    chave_api = TREINO_API_KEY
     resultado = {
         "url_configurada": TREINO_API_URL,
         "api_key_configurada": bool(chave_api),
@@ -199,65 +200,6 @@ def _converter_texto_para_dias(treino_texto: str, dados) -> list:
             }
             for i in range(frequencia)
         ]
-
-
-def _gerar_fallback(dados):
-    """
-    Gera treino baseado em regras quando a API externa não está disponível.
-    """
-    objetivo = dados.objetivo.lower() if dados.objetivo else "hipertrofia"
-    nivel = dados.nivel.lower() if dados.nivel else "intermediario"
-    frequencia = dados.vezes_por_semana if dados.vezes_por_semana else 3
-    tempo = dados.tempo if dados.tempo else 30
-
-    exercicios_db = {
-        "hipertrofia": {
-            "iniciante": [
-                {"exercicio": "Supino reto", "series": 3, "repeticoes": "10-12", "descanso": "60s"},
-                {"exercicio": "Puxada frontal", "series": 3, "repeticoes": "10-12", "descanso": "60s"},
-                {"exercicio": "Agachamento", "series": 3, "repeticoes": "12-15", "descanso": "60s"},
-                {"exercicio": "Desenvolvimento", "series": 3, "repeticoes": "10-12", "descanso": "60s"},
-                {"exercicio": "Rosca direta", "series": 3, "repeticoes": "12-15", "descanso": "45s"},
-            ],
-            "intermediario": [
-                {"exercicio": "Supino inclinado", "series": 4, "repeticoes": "8-10", "descanso": "75s"},
-                {"exercicio": "Remada curvada", "series": 4, "repeticoes": "8-10", "descanso": "75s"},
-                {"exercicio": "Leg press", "series": 4, "repeticoes": "10-12", "descanso": "75s"},
-                {"exercicio": "Elevação lateral", "series": 3, "repeticoes": "12-15", "descanso": "45s"},
-                {"exercicio": "Tríceps pulley", "series": 3, "repeticoes": "12-15", "descanso": "45s"},
-            ],
-            "avancado": [
-                {"exercicio": "Supino reto pesado", "series": 5, "repeticoes": "6-8", "descanso": "90s"},
-                {"exercicio": "Barra fixa", "series": 5, "repeticoes": "6-8", "descanso": "90s"},
-                {"exercicio": "Agachamento livre", "series": 5, "repeticoes": "8-10", "descanso": "90s"},
-                {"exercicio": "Desenvolvimento militar", "series": 4, "repeticoes": "8-10", "descanso": "75s"},
-                {"exercicio": "Rosca alternada", "series": 4, "repeticoes": "10-12", "descanso": "60s"},
-            ],
-        },
-    }
-
-    obj_key = "hipertrofia"
-    for k in exercicios_db:
-        if k in objetivo:
-            obj_key = k
-            break
-
-    nivel_exercicios = exercicios_db[obj_key].get(nivel, exercicios_db[obj_key]["iniciante"])
-
-    exercicios_texto = "Aquecimento: 5 min\n"
-    for ex in nivel_exercicios:
-        exercicios_texto += f"{ex['exercicio']} {ex['series']}x{ex['repeticoes']} (Desc: {ex['descanso']})\n"
-    exercicios_texto += f"\nTempo estimado: {tempo} min"
-
-    letras = ['A', 'B', 'C', 'D', 'E', 'F']
-    return [
-        {
-            "dia": f"Treino {letras[i]}",
-            "foco": f"{objetivo.capitalize()} ({nivel.capitalize()}) - Fallback Local",
-            "exercicios": exercicios_texto,
-        }
-        for i in range(min(frequencia, len(letras)))
-    ]
 
 
 def processar_resposta_ia(resposta):
