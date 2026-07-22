@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+try:
+    from sqlalchemy import select
+except ImportError:
+    from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from database.connection import get_db
 from schemas.treino_schema import TreinoRequest, WorkoutResponse
