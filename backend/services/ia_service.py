@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# URL base da API Flask de treinos
-TREINO_API_URL = os.getenv("TREINO_API_URL", "http://localhost:5000/api/v1")
+# URL base da API de treinos no Render
+TREINO_API_URL = os.getenv("TREINO_API_URL", "https://api-treino-ygh4.onrender.com/api/v1")
 TREINO_API_KEY = os.getenv("TREINO_API_KEY", "")
 
 # Cache simples para evitar chamadas repetidas (1 hora)
@@ -20,9 +20,8 @@ _cache_tempo = {}
 
 def gerar_treino_ia(dados):
     """
-    Gera treino personalizado chamando a API Flask externa (que usa o Gemini internamente).
-    Faz fallback para gerador local caso a API esteja inacessível.
-    Roda em thread pool para não bloquear o event loop do FastAPI.
+    Gera treino personalizado chamando a API no Render (que usa o Gemini internamente).
+    Faz fallback para None caso a API esteja inacessível.
     """
     try:
         chave = hashlib.md5(str(dados.__dict__).encode()).hexdigest()
@@ -48,7 +47,7 @@ def gerar_treino_ia(dados):
 
 def _chamar_api_externa_sync(dados):
     """
-    Chama o endpoint POST /api/v1/treino da API Flask do usuário de forma síncrona.
+    Chama o endpoint POST /api/v1/treino da API no Render de forma síncrona.
     """
     headers = {"Content-Type": "application/json"}
     chave_api = TREINO_API_KEY
@@ -61,11 +60,11 @@ def _chamar_api_externa_sync(dados):
     }
 
     url = f"{TREINO_API_URL}/treino"
-    print(f"🔗 Chamando API Flask: {url}")
+    print(f"🔗 Chamando API Render: {url}")
     print(f"📤 Payload: {payload}")
 
     try:
-        with httpx.Client(timeout=20.0) as client:
+        with httpx.Client(timeout=60.0) as client:
             response = client.post(url, json=payload, headers=headers)
 
         print(f"📥 Status: {response.status_code}")
@@ -76,12 +75,12 @@ def _chamar_api_externa_sync(dados):
             return None
 
         if response.status_code == 429:
-            print(f"⏱️ Rate limit atingido na API Flask (5 por minuto). Aguarde.")
+            print(f"⏱️ Rate limit atingido. Aguarde.")
             return None
 
         response.raise_for_status()
         data = response.json()
-        print(f"✅ API Flask respondeu: {list(data.keys())}")
+        print(f"✅ API Render respondeu: {list(data.keys())}")
 
         treino_texto = data.get("treino_gerado", "")
         if not treino_texto:
@@ -94,7 +93,7 @@ def _chamar_api_externa_sync(dados):
         print(f"❌ Não conseguiu conectar em {url}: {e}")
         return None
     except httpx.TimeoutException:
-        print(f"⏳ Timeout ao chamar {url}")
+        print(f"⏳ Timeout ao chamar {url} (API pode estar dormindo no Render free tier)")
         return None
     except httpx.HTTPStatusError as e:
         print(f"❌ Erro HTTP {e.response.status_code}: {e.response.text}")
@@ -106,7 +105,7 @@ def _chamar_api_externa_sync(dados):
 
 async def testar_conexao_flask():
     """
-    Testa a conexão com a API Flask e retorna um diagnóstico detalhado.
+    Testa a conexão com a API no Render e retorna um diagnóstico detalhado.
     """
     url = f"{TREINO_API_URL}/health"
     chave_api = TREINO_API_KEY
@@ -123,7 +122,7 @@ async def testar_conexao_flask():
         if chave_api:
             headers["X-API-KEY"] = chave_api
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             # Testa o health check
             try:
                 r = await client.get(url, headers=headers)
@@ -156,7 +155,7 @@ async def testar_conexao_flask():
 
 def _converter_texto_para_dias(treino_texto: str, dados) -> list:
     """
-    Converte o texto livre retornado pela API Flask para o formato de array de dias
+    Converte o texto livre retornado pela API para o formato de array de dias
     que o app mobile espera: [{ "dia", "foco", "exercicios" }]
     """
     frequencia = dados.vezes_por_semana or 3
