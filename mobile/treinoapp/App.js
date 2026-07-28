@@ -23,22 +23,48 @@ import * as XLSX from 'xlsx';
 const FILE_PATH = FileSystem.documentDirectory + 'treino_ai_data.json';
 
 const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = (Math.random() * 16) | 0,
+      v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 };
 
+// Dados de demonstração para os gráficos de rendimento.
+// Isso será substituído por dados reais quando a checklist de treinos for implementada.
+const DADOS_DEMO_SEMANA = [
+  { label: 'Seg', valor: 80 },
+  { label: 'Ter', valor: 60 },
+  { label: 'Qua', valor: 95 },
+  { label: 'Qui', valor: 40 },
+  { label: 'Sex', valor: 100 },
+  { label: 'Sáb', valor: 65 },
+  { label: 'Dom', valor: 20 },
+];
+
+const DADOS_DEMO_EVOLUCAO = [
+  { label: 'S1', valor: 55 },
+  { label: 'S2', valor: 60 },
+  { label: 'S3', valor: 58 },
+  { label: 'S4', valor: 68 },
+  { label: 'S5', valor: 72 },
+  { label: 'S6', valor: 78 },
+];
+
 export default function App() {
+  // Navegação principal por telas (sem dependências externas de navegação)
+  // 'login' | 'hub' | 'treino' | 'historico' | 'planilhas' | 'config' | 'perfil'
+  const [tela, setTela] = useState('hub');
+
   const [userId, setUserId] = useState('');
   const [objetivo, setObjetivo] = useState('');
   const [idade, setIdade] = useState('');
   const [peso, setPeso] = useState('');
   const [altura, setAltura] = useState('');
   const [frequencia, setFrequencia] = useState('3');
-  const [diasAberto, setDiasAberto] = useState(false); // Estado do seletor retrátil
+  const [diasAberto, setDiasAberto] = useState(false);
   const [tempo, setTempo] = useState(30);
-  
+
   const [backendUrl, setBackendUrl] = useState(
     Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000'
   );
@@ -77,6 +103,8 @@ export default function App() {
           if (dados.tempo) setTempo(Number(dados.tempo));
           if (dados.backendUrl) setBackendUrl(dados.backendUrl);
           if (dados.treino) setTreino(dados.treino);
+          if (dados.logado) setLogado(!!dados.logado);
+          if (dados.nomeUsuario) setNomeUsuario(dados.nomeUsuario);
         } else {
           setUserId(generateUUID());
         }
@@ -101,6 +129,8 @@ export default function App() {
         tempo: dadosNovos.tempo ?? tempo,
         backendUrl: dadosNovos.backendUrl ?? backendUrl,
         treino: dadosNovos.treino !== undefined ? dadosNovos.treino : treino,
+        logado: dadosNovos.logado ?? logado,
+        nomeUsuario: dadosNovos.nomeUsuario ?? nomeUsuario,
       };
 
       if (Platform.OS === 'web') {
@@ -134,7 +164,7 @@ export default function App() {
 
       const response = await fetch(`${backendUrl}/gerar-treino-ia`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
@@ -145,7 +175,7 @@ export default function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Erro na API');
 
-      const lista = Array.isArray(data) ? data : (data.treino || []);
+      const lista = Array.isArray(data) ? data : data.treino || [];
       if (lista.length > 0) {
         setTreino(lista);
         salvarDadosLocais({
@@ -178,20 +208,24 @@ export default function App() {
       console.warn('Erro ao carregar histórico:', error.message);
     } finally {
       setLoadingHistorico(false);
-      setExibirHistorico(true);
     }
   };
 
+  const abrirHistorico = () => {
+    setTela('historico');
+    carregarHistorico();
+  };
+
   const selecionarTreinoHistorico = (treinoHistorico) => {
-    const treinoFormatado = treinoHistorico.days.map(d => ({
+    const treinoFormatado = treinoHistorico.days.map((d) => ({
       dia: d.dia,
       foco: d.foco,
       exercicios: d.exercicios,
     }));
     setTreino(treinoFormatado);
-    setExibirHistorico(false);
     salvarDadosLocais({ treino: treinoFormatado });
-    Alert.alert('Sucesso', 'Treino selecionado carregado na tela principal!');
+    Alert.alert('Sucesso', 'Treino selecionado carregado!');
+    setTela('treino');
   };
 
   const limparTreino = () => {
@@ -214,7 +248,14 @@ export default function App() {
     });
   };
 
-  const exportarExcel = async () => {
+  // exportarExcel agora aceita um treino específico (usado na tela de Planilhas
+  // para exportar tanto o treino ativo quanto qualquer treino do histórico)
+  const exportarExcel = async (treinoParaExportar, nomeArquivo = 'Treino_Semanal') => {
+    const dadosTreino = treinoParaExportar || treino;
+    if (!dadosTreino || dadosTreino.length === 0) {
+      Alert.alert('Atenção', 'Não há treino para exportar.');
+      return;
+    }
     try {
       const workbook = XLSX.utils.book_new();
       const planilha = [];
@@ -224,7 +265,7 @@ export default function App() {
       planilha.push(['Frequência', `${frequencia}x por semana`, `Tempo por sessão: ${tempo} min`]);
       planilha.push(['', '', '']);
 
-      treino.forEach((dia) => {
+      dadosTreino.forEach((dia) => {
         planilha.push([dia.dia.toUpperCase(), dia.foco, '']);
         const linhas = (dia.exercicios || '').split('\n').filter(Boolean);
         linhas.forEach((linha) => planilha.push(['', linha, '']));
@@ -241,14 +282,14 @@ export default function App() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'Treino_Semanal.xlsx';
+        a.download = `${nomeArquivo}.xlsx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
+        const filePath = FileSystem.documentDirectory + `${nomeArquivo}.xlsx`;
         const wbout = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
-        const filePath = FileSystem.documentDirectory + 'Treino_Semanal.xlsx';
         await FileSystem.writeAsStringAsync(filePath, wbout, { encoding: FileSystem.EncodingType.Base64 });
         const podeCompartilhar = await Sharing.isAvailableAsync();
         if (podeCompartilhar) {
@@ -266,61 +307,59 @@ export default function App() {
     }
   };
 
+  // ---------- PERFIL / IMC ----------
+  const calcularIMC = () => {
+    const p = Number(peso);
+    const a = Number(altura) / 100;
+    if (!p || !a) return null;
+    return p / (a * a);
+  };
+
+  const classificarIMC = (imc) => {
+    if (imc < 18.5) return 'Abaixo do peso';
+    if (imc < 25) return 'Peso normal';
+    if (imc < 30) return 'Sobrepeso';
+    return 'Obesidade';
+  };
+
+  const imcAtual = calcularIMC();
+
   const formValido = objetivo.trim() && idade && peso && altura && frequencia;
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
-      
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : null}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerRow}>
-              <View style={styles.logoContainer}>
-                <Image 
-                  source={require('./assets/logo.png')} 
-                  style={styles.logoImage} 
-                  resizeMode="contain"
-                />
-              </View>
+  // ---------- COMPONENTES AUXILIARES ----------
 
-              <TouchableOpacity 
-                style={styles.menuIconButton} 
-                onPress={() => setMostrarMenu(true)}
-                activeOpacity={0.6}
-              >
-                <Ionicons name="menu" size={28} color="#00FF66" />
-              </TouchableOpacity>
+  const BarChart = ({ dados, sufixo = '' }) => {
+    const maxValor = Math.max(...dados.map((d) => d.valor), 1);
+    return (
+      <View style={styles.chartRow}>
+        {dados.map((d, i) => (
+          <View key={i} style={styles.chartBarWrapper}>
+            <Text style={styles.chartValueLabel}>{d.valor}{sufixo}</Text>
+            <View style={styles.chartBarTrack}>
+              <View
+                style={[
+                  styles.chartBarFill,
+                  { height: `${Math.max((d.valor / maxValor) * 100, 4)}%` },
+                ]}
+              />
             </View>
+            <Text style={styles.chartAxisLabel}>{d.label}</Text>
           </View>
+        ))}
+      </View>
+    );
+  };
 
-          {/* GAVETA LATERAL (LARGURA AJUSTADA AO TAMANHO DO BOTÃO) */}
-          <Modal
-            visible={mostrarMenu}
-            animationType="fade"
-            transparent={true}
-            onRequestClose={() => setMostrarMenu(false)}
-          >
-            <TouchableOpacity 
-              style={styles.drawerOverlay} 
-              activeOpacity={1} 
-              onPress={() => setMostrarMenu(false)}
-            >
-              <View style={styles.drawerContent} onStartShouldSetResponder={() => true}>
-                <View style={styles.drawerHeader}>
-                  <Text style={styles.drawerTitle}>Menu</Text>
-                  <TouchableOpacity onPress={() => setMostrarMenu(false)}>
-                    <Ionicons name="close" size={24} color="#A1A1AA" />
-                  </TouchableOpacity>
-                </View>
+  const HeaderPrincipal = () => (
+    <View style={styles.header}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.logoContainer}
+          onPress={() => setTela('hub')}
+        >
+          <Image source={require('./assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+        </TouchableOpacity>
 
                 {/* Opções ajustadas com limite e sem sobras */}
 
@@ -359,40 +398,56 @@ export default function App() {
                   </TouchableOpacity>
                 </View>
 
-                {loadingHistorico ? (
-                  <ActivityIndicator color="#00FF66" size="large" style={{ marginVertical: 30 }} />
-                ) : (
-                  <ScrollView style={styles.modalBody}>
-                    {historico.length === 0 ? (
-                      <View style={{ alignItems: 'center', marginVertical: 20 }}>
-                        <Ionicons name="barbell-outline" size={40} color="#71717A" />
-                        <Text style={styles.historicoVazio}>Nenhum treino salvo no servidor.</Text>
-                      </View>
-                    ) : (
-                      historico.map((h, i) => (
-                        <View key={i} style={styles.historicoCard}>
-                          <View>
-                            <Text style={styles.historicoCardDate}>
-                              {new Date(h.created_at).toLocaleDateString('pt-BR')}
-                            </Text>
-                            <Text style={styles.historicoCardDetails}>
-                              {h.days ? h.days.length : 0} sessões divididas
-                            </Text>
-                          </View>
-                          <TouchableOpacity 
-                            style={styles.historicoLoadBtn} 
-                            onPress={() => selecionarTreinoHistorico(h)}
-                          >
-                            <Text style={styles.historicoLoadBtnText}>Carregar</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ))
-                    )}
-                  </ScrollView>
-                )}
-              </View>
-            </View>
-          </Modal>
+  // ---------- TELA: LOGIN ----------
+  const renderLogin = () => (
+    <View style={styles.inputSection}>
+      <View style={styles.loginIconWrap}>
+        <Ionicons name="person-circle-outline" size={72} color="#00FF66" />
+      </View>
+      <Text style={styles.loginTitle}>Entrar na sua conta</Text>
+      <Text style={styles.configHelp}>Acesse para salvar seu perfil e acompanhar sua evolução.</Text>
+
+      <Text style={styles.label}>E-mail</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="voce@email.com"
+        placeholderTextColor="#71717A"
+        value={emailLogin}
+        onChangeText={setEmailLogin}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
+
+      <View style={{ height: 16 }} />
+
+      <Text style={styles.label}>Senha</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="••••••••"
+        placeholderTextColor="#71717A"
+        value={senhaLogin}
+        onChangeText={setSenhaLogin}
+        secureTextEntry
+        autoCapitalize="none"
+      />
+
+      <TouchableOpacity style={[styles.button, { marginTop: 24 }]} onPress={fazerLogin}>
+        <Text style={styles.buttonText}>Entrar</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.buttonOutline} onPress={() => setTela('hub')}>
+        <Text style={styles.buttonOutlineText}>Continuar sem login</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // ---------- TELA: HUB (INÍCIO) ----------
+  const renderHub = () => (
+    <View style={styles.inputSection}>
+      <Text style={styles.hubGreeting}>
+        {logado ? `Olá, ${nomeUsuario}! 💪` : 'Bem-vindo(a)! 💪'}
+      </Text>
+      <Text style={styles.configHelp}>Aqui está um resumo do seu rendimento.</Text>
 
           {/* Abas */}
           {activeTab === 'Home' && (
@@ -401,131 +456,196 @@ export default function App() {
             <View style={styles.inputSection}>
               <Text style={styles.label}>Qual o seu objetivo?</Text>
               <TextInput
-                style={styles.inputArea}
-                placeholder="Ex: Quero hipertrofia e ganho de massa..."
+                style={styles.input}
+                placeholder="175"
                 placeholderTextColor="#71717A"
-                multiline
-                numberOfLines={3}
-                value={objetivo}
+                keyboardType="numeric"
+                value={altura}
                 onChangeText={(text) => {
-                  setObjetivo(text);
-                  salvarDadosLocais({ objetivo: text });
+                  setAltura(text);
+                  salvarDadosLocais({ altura: text });
                 }}
               />
+            </View>
+          </View>
 
               {/* Físicos foram movidos para a aba de Perfil */}
 
-              {/* SELETOR RETRÁTIL DE DIAS (DROPDOWN) */}
-              <View style={styles.daysContainer}>
-                <Text style={styles.label}>Dias de treino por semana</Text>
-                
-                <TouchableOpacity
-                  style={styles.dropdownHeader}
-                  onPress={() => setDiasAberto(!diasAberto)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.dropdownHeaderText}>
-                    {frequencia} {frequencia === '1' ? 'dia por semana' : 'dias por semana'}
-                  </Text>
-                  <Ionicons 
-                    name={diasAberto ? "chevron-up" : "chevron-down"} 
-                    size={20} 
-                    color="#00FF66" 
-                  />
-                </TouchableOpacity>
+            <TouchableOpacity style={styles.dropdownHeader} onPress={() => setDiasAberto(!diasAberto)} activeOpacity={0.7}>
+              <Text style={styles.dropdownHeaderText}>
+                {frequencia} {frequencia === '1' ? 'dia por semana' : 'dias por semana'}
+              </Text>
+              <Ionicons name={diasAberto ? 'chevron-up' : 'chevron-down'} size={20} color="#00FF66" />
+            </TouchableOpacity>
 
-                {diasAberto && (
-                  <View style={styles.dropdownList}>
-                    {['1', '2', '3', '4', '5', '6', '7'].map((d) => (
-                      <TouchableOpacity
-                        key={d}
-                        style={[styles.dropdownItem, frequencia === d && styles.dropdownItemActive]}
-                        onPress={() => {
-                          setFrequencia(d);
-                          salvarDadosLocais({ frequencia: d });
-                          setDiasAberto(false);
-                        }}
-                      >
-                        <Text style={[styles.dropdownItemText, frequencia === d && styles.dropdownItemTextActive]}>
-                          {d} {d === '1' ? 'dia ' : 'dias '}
-                        </Text>
-                        {frequencia === d && (
-                          <Ionicons name="checkmark" size={18} color="#00FF66" />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.sliderContainer}>
-                <Text style={styles.label}>Tempo por treino</Text>
-                <View style={styles.timeSelector}>
-                  <TouchableOpacity 
-                    style={styles.timeButton}
+            {diasAberto && (
+              <View style={styles.dropdownList}>
+                {['1', '2', '3', '4', '5', '6', '7'].map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.dropdownItem, frequencia === d && styles.dropdownItemActive]}
                     onPress={() => {
-                      const novo = Math.max(15, tempo - 5);
-                      setTempo(novo);
-                      salvarDadosLocais({ tempo: novo });
+                      setFrequencia(d);
+                      salvarDadosLocais({ frequencia: d });
+                      setDiasAberto(false);
                     }}
                   >
-                    <Text style={styles.timeButtonText}>-</Text>
+                    <Text style={[styles.dropdownItemText, frequencia === d && styles.dropdownItemTextActive]}>
+                      {d} {d === '1' ? 'dia ' : 'dias '}
+                    </Text>
+                    {frequencia === d && <Ionicons name="checkmark" size={18} color="#00FF66" />}
                   </TouchableOpacity>
-                  
-                  <View style={styles.timeValueContainer}>
-                    <Text style={styles.timeValueText}>{tempo}</Text>
-                    <Text style={styles.timeLabelText}>min</Text>
-                  </View>
-
-                  <TouchableOpacity 
-                    style={styles.timeButton}
-                    onPress={() => {
-                      const novo = Math.min(120, tempo + 5);
-                      setTempo(novo);
-                      salvarDadosLocais({ tempo: novo });
-                    }}
-                  >
-                    <Text style={styles.timeButtonText}>+</Text>
-                  </TouchableOpacity>
-                </View>
+                ))}
               </View>
+            )}
+          </View>
 
-              <TouchableOpacity 
-                style={[styles.button, !formValido && styles.buttonDisabled]} 
-                onPress={gerarTreino}
-                disabled={!formValido || loading}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.label}>Tempo por treino</Text>
+            <View style={styles.timeSelector}>
+              <TouchableOpacity
+                style={styles.timeButton}
+                onPress={() => {
+                  const novo = Math.max(15, tempo - 5);
+                  setTempo(novo);
+                  salvarDadosLocais({ tempo: novo });
+                }}
               >
-                {loading ? (
-                  <ActivityIndicator color="#121212" size="small" />
-                ) : (
-                  <Text style={styles.buttonText}>Gerar Meu Treino</Text>
-                )}
+                <Text style={styles.timeButtonText}>-</Text>
+              </TouchableOpacity>
+
+              <View style={styles.timeValueContainer}>
+                <Text style={styles.timeValueText}>{tempo}</Text>
+                <Text style={styles.timeLabelText}>min</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.timeButton}
+                onPress={() => {
+                  const novo = Math.min(120, tempo + 5);
+                  setTempo(novo);
+                  salvarDadosLocais({ tempo: novo });
+                }}
+              >
+                <Text style={styles.timeButtonText}>+</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            /* Resultados */
-            <View style={styles.resultSection}>
-              <Text style={styles.successTitle}>Treino Ativo Gerado!</Text>
-              <Text style={styles.successSubtitle}>Foco: {tempo} min | Frequência: {frequencia}x na semana</Text>
-              
-              {treino.map((diaInfo, index) => (
-                <View key={index} style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardDay}>{diaInfo.dia}</Text>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{diaInfo.foco}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.cardExercises}>{diaInfo.exercicios}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, !formValido && styles.buttonDisabled]}
+            onPress={gerarTreino}
+            disabled={!formValido || loading}
+          >
+            {loading ? <ActivityIndicator color="#121212" size="small" /> : <Text style={styles.buttonText}>Gerar Meu Treino</Text>}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.resultSection}>
+          <Text style={styles.successTitle}>Treino Ativo Gerado!</Text>
+          <Text style={styles.successSubtitle}>
+            Foco: {tempo} min | Frequência: {frequencia}x na semana
+          </Text>
+
+          {treino.map((diaInfo, index) => (
+            <View key={index} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardDay}>{diaInfo.dia}</Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{diaInfo.foco}</Text>
                 </View>
-              ))}
+              </View>
+              <Text style={styles.cardExercises}>{diaInfo.exercicios}</Text>
+            </View>
+          ))}
 
-              <TouchableOpacity style={styles.buttonExcel} onPress={exportarExcel}>
-                <Text style={styles.buttonExcelText}>📥  Baixar Planilha Excel</Text>
+          <TouchableOpacity style={styles.buttonExcel} onPress={() => exportarExcel(treino)}>
+            <Text style={styles.buttonExcelText}>📥  Baixar Planilha Excel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.buttonOutline} onPress={limparTreino}>
+            <Text style={styles.buttonOutlineText}>Ajustar Perfil</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  // ---------- TELA: TREINOS GERADOS (HISTÓRICO) ----------
+  const renderHistorico = () => (
+    <View>
+      <TelaVoltar titulo="Treinos Gerados" />
+      <View style={styles.inputSection}>
+        {loadingHistorico ? (
+          <ActivityIndicator color="#00FF66" size="large" style={{ marginVertical: 30 }} />
+        ) : historico.length === 0 ? (
+          <View style={{ alignItems: 'center', marginVertical: 20 }}>
+            <Ionicons name="barbell-outline" size={40} color="#71717A" />
+            <Text style={styles.historicoVazio}>Nenhum treino salvo no servidor.</Text>
+          </View>
+        ) : (
+          historico.map((h, i) => (
+            <View key={i} style={styles.historicoCard}>
+              <View>
+                <Text style={styles.historicoCardDate}>{new Date(h.created_at).toLocaleDateString('pt-BR')}</Text>
+                <Text style={styles.historicoCardDetails}>{h.days ? h.days.length : 0} sessões divididas</Text>
+              </View>
+              <TouchableOpacity style={styles.historicoLoadBtn} onPress={() => selecionarTreinoHistorico(h)}>
+                <Text style={styles.historicoLoadBtnText}>Carregar</Text>
               </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
 
-              <TouchableOpacity style={styles.buttonOutline} onPress={limparTreino}>
-                <Text style={styles.buttonOutlineText}>Ajustar Perfil</Text>
+  // ---------- TELA: PLANILHAS PARA DOWNLOAD ----------
+  const renderPlanilhas = () => (
+    <View>
+      <TelaVoltar titulo="Planilhas" />
+      <View style={styles.inputSection}>
+        <Text style={styles.configHelp}>Baixe seus treinos em formato Excel (.xlsx).</Text>
+
+        {treino ? (
+          <View style={styles.historicoCard}>
+            <View style={{ flexShrink: 1 }}>
+              <Text style={styles.historicoCardDate}>Treino Ativo</Text>
+              <Text style={styles.historicoCardDetails}>{treino.length} dias | {frequencia}x por semana</Text>
+            </View>
+            <TouchableOpacity style={styles.historicoLoadBtn} onPress={() => exportarExcel(treino, 'Treino_Ativo')}>
+              <Text style={styles.historicoLoadBtnText}>Baixar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ alignItems: 'center', marginVertical: 12 }}>
+            <Ionicons name="document-text-outline" size={36} color="#71717A" />
+            <Text style={styles.historicoVazio}>Nenhum treino ativo no momento.</Text>
+          </View>
+        )}
+
+        <Text style={[styles.label, { marginTop: 10 }]}>Histórico</Text>
+        {loadingHistorico ? (
+          <ActivityIndicator color="#00FF66" size="large" style={{ marginVertical: 20 }} />
+        ) : historico.length === 0 ? (
+          <Text style={styles.historicoVazio}>Nenhum treino no histórico para baixar.</Text>
+        ) : (
+          historico.map((h, i) => (
+            <View key={i} style={styles.historicoCard}>
+              <View>
+                <Text style={styles.historicoCardDate}>{new Date(h.created_at).toLocaleDateString('pt-BR')}</Text>
+                <Text style={styles.historicoCardDetails}>{h.days ? h.days.length : 0} sessões divididas</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.historicoLoadBtn}
+                onPress={() =>
+                  exportarExcel(
+                    h.days.map((d) => ({ dia: d.dia, foco: d.foco, exercicios: d.exercicios })),
+                    `Treino_${new Date(h.created_at).toLocaleDateString('pt-BR').replace(/\//g, '-')}`
+                  )
+                }
+              >
+                <Text style={styles.historicoLoadBtnText}>Baixar</Text>
               </TouchableOpacity>
             </View>
               )}
@@ -584,6 +704,101 @@ export default function App() {
             </View>
           )}
 
+          <Text style={styles.label}>Objetivo</Text>
+          <TextInput
+            style={styles.inputArea}
+            placeholder="Ex: Quero hipertrofia e ganho de massa..."
+            placeholderTextColor="#71717A"
+            multiline
+            numberOfLines={3}
+            value={objetivo}
+            onChangeText={(text) => {
+              setObjetivo(text);
+              salvarDadosLocais({ objetivo: text });
+            }}
+          />
+
+          <View style={styles.row}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.labelSmall}>Idade</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="25"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={idade}
+                onChangeText={(text) => {
+                  setIdade(text);
+                  salvarDadosLocais({ idade: text });
+                }}
+              />
+            </View>
+            <View style={[styles.inputGroup, { marginLeft: 12 }]}>
+              <Text style={styles.labelSmall}>Peso (kg)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="75"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={peso}
+                onChangeText={(text) => {
+                  setPeso(text);
+                  salvarDadosLocais({ peso: text });
+                }}
+              />
+            </View>
+            <View style={[styles.inputGroup, { marginLeft: 12 }]}>
+              <Text style={styles.labelSmall}>Altura (cm)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="175"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={altura}
+                onChangeText={(text) => {
+                  setAltura(text);
+                  salvarDadosLocais({ altura: text });
+                }}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.buttonOutline} onPress={fazerLogout}>
+            <Text style={styles.buttonOutlineText}>Sair da conta</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderConteudo = () => {
+    switch (tela) {
+      case 'login':
+        return renderLogin();
+      case 'treino':
+        return renderTreino();
+      case 'historico':
+        return renderHistorico();
+      case 'planilhas':
+        return renderPlanilhas();
+      case 'config':
+        return renderConfig();
+      case 'perfil':
+        return renderPerfil();
+      case 'hub':
+      default:
+        return renderHub();
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : null}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <HeaderPrincipal />
+          {renderConteudo()}
         </ScrollView>
         
         {/* BOTTOM TAB BAR */}
@@ -653,60 +868,138 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  menuIconButton: {
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconButton: {
     padding: 6,
+    marginLeft: 6,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // GAVETA LATERAL AJUSTADA (Sem tamanho fixo de 50%/65%)
-  drawerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  drawerContent: {
-    backgroundColor: '#1A1A1A',
-    height: '100%',
+  // NAVEGAÇÃO DE TELA (BOTÃO VOLTAR)
+  telaHeaderRow: {
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderLeftWidth: 1,
-    borderLeftColor: '#27272A',
-    maxWidth: '80%', // Limite máximo para não cobrir a tela toda
-  },
-  drawerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
+    marginBottom: 8,
   },
-  drawerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  drawerItem: {
+  voltarButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingRight: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
   },
-  drawerItemText: {
-    color: '#FFFFFF',
+  voltarButtonText: {
+    color: '#00FF66',
     fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  telaHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  drawerItemSubtext: {
+  // LOGIN
+  loginIconWrap: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  loginTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  // HUB
+  hubGreeting: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  hubGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  hubCard: {
+    width: '48%',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  hubCardText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 10,
+  },
+  // GRÁFICOS (DEMONSTRATIVOS)
+  chartCard: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  chartCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 14,
+  },
+  chartRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 120,
+  },
+  chartBarWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: '100%',
+  },
+  chartValueLabel: {
+    color: '#71717A',
+    fontSize: 9,
+    marginBottom: 4,
+  },
+  chartBarTrack: {
+    width: 14,
+    flex: 1,
+    backgroundColor: '#27272A',
+    borderRadius: 6,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  chartBarFill: {
+    width: '100%',
+    backgroundColor: '#00FF66',
+    borderRadius: 6,
+  },
+  chartAxisLabel: {
+    color: '#A1A1AA',
+    fontSize: 10,
+    marginTop: 6,
+  },
+  chartDemoNote: {
     color: '#71717A',
     fontSize: 11,
-    marginTop: 2,
+    marginTop: 12,
+    lineHeight: 16,
   },
-  // MODAIS
+  // MODAIS / TELAS
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -720,23 +1013,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27272A',
     maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
-    paddingBottom: 10,
-  },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  modalBody: {
-    marginBottom: 10,
   },
   configLabel: {
     color: '#A1A1AA',
@@ -758,6 +1034,7 @@ const styles = StyleSheet.create({
     color: '#71717A',
     fontSize: 12,
     marginBottom: 16,
+    textAlign: 'center',
   },
   uuidText: {
     color: '#00FF66',
@@ -842,6 +1119,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     borderWidth: 1,
     borderColor: '#27272A',
+  },
+  // IMC
+  imcCard: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  imcLabel: {
+    color: '#A1A1AA',
+    fontSize: 13,
+  },
+  imcValue: {
+    color: '#00FF66',
+    fontSize: 34,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  imcClassificacao: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
   },
   // DROPDOWN RETRÁTIL
   daysContainer: {
