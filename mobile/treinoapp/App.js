@@ -23,31 +23,59 @@ import * as XLSX from 'xlsx';
 const FILE_PATH = FileSystem.documentDirectory + 'treino_ai_data.json';
 
 const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = (Math.random() * 16) | 0,
+      v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 };
 
+// Dados de demonstração para os gráficos de rendimento.
+// Isso será substituído por dados reais quando a checklist de treinos for implementada.
+const DADOS_DEMO_SEMANA = [
+  { label: 'Seg', valor: 80 },
+  { label: 'Ter', valor: 60 },
+  { label: 'Qua', valor: 95 },
+  { label: 'Qui', valor: 40 },
+  { label: 'Sex', valor: 100 },
+  { label: 'Sáb', valor: 65 },
+  { label: 'Dom', valor: 20 },
+];
+
+const DADOS_DEMO_EVOLUCAO = [
+  { label: 'S1', valor: 55 },
+  { label: 'S2', valor: 60 },
+  { label: 'S3', valor: 58 },
+  { label: 'S4', valor: 68 },
+  { label: 'S5', valor: 72 },
+  { label: 'S6', valor: 78 },
+];
+
 export default function App() {
+  // Navegação principal por telas (sem dependências externas de navegação)
+  // 'login' | 'hub' | 'treino' | 'historico' | 'planilhas' | 'config' | 'perfil'
+  const [tela, setTela] = useState('hub');
+
   const [userId, setUserId] = useState('');
   const [objetivo, setObjetivo] = useState('');
   const [idade, setIdade] = useState('');
   const [peso, setPeso] = useState('');
   const [altura, setAltura] = useState('');
   const [frequencia, setFrequencia] = useState('3');
-  const [diasAberto, setDiasAberto] = useState(false); // Estado do seletor retrátil
+  const [diasAberto, setDiasAberto] = useState(false);
   const [tempo, setTempo] = useState(30);
-  
+
   const [backendUrl, setBackendUrl] = useState(
     Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000'
   );
   const [apiKey, setApiKey] = useState('');
-  
-  // Modais e Navegação
-  const [mostrarMenu, setMostrarMenu] = useState(false);
-  const [mostrarConfigRede, setMostrarConfigRede] = useState(false);
-  const [exibirHistorico, setExibirHistorico] = useState(false);
+
+  // Autenticação (local/simples, pronta para plugar num backend real depois)
+  const [logado, setLogado] = useState(false);
+  const [nomeUsuario, setNomeUsuario] = useState('');
+  const [emailLogin, setEmailLogin] = useState('');
+  const [senhaLogin, setSenhaLogin] = useState('');
+
   const [historico, setHistorico] = useState([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
 
@@ -79,6 +107,8 @@ export default function App() {
           if (dados.backendUrl) setBackendUrl(dados.backendUrl);
           if (dados.apiKey) setApiKey(dados.apiKey);
           if (dados.treino) setTreino(dados.treino);
+          if (dados.logado) setLogado(!!dados.logado);
+          if (dados.nomeUsuario) setNomeUsuario(dados.nomeUsuario);
         } else {
           setUserId(generateUUID());
         }
@@ -104,6 +134,8 @@ export default function App() {
         backendUrl: dadosNovos.backendUrl ?? backendUrl,
         apiKey: dadosNovos.apiKey ?? apiKey,
         treino: dadosNovos.treino !== undefined ? dadosNovos.treino : treino,
+        logado: dadosNovos.logado ?? logado,
+        nomeUsuario: dadosNovos.nomeUsuario ?? nomeUsuario,
       };
 
       if (Platform.OS === 'web') {
@@ -116,18 +148,42 @@ export default function App() {
     }
   };
 
+  // ---------- AUTENTICAÇÃO ----------
+  const fazerLogin = () => {
+    if (!emailLogin.trim() || !senhaLogin.trim()) {
+      Alert.alert('Atenção', 'Preencha e-mail e senha para entrar.');
+      return;
+    }
+    const nome = emailLogin.split('@')[0];
+    setLogado(true);
+    setNomeUsuario(nome);
+    salvarDadosLocais({ logado: true, nomeUsuario: nome });
+    setSenhaLogin('');
+    setTela('perfil');
+  };
+
+  const fazerLogout = () => {
+    setLogado(false);
+    setNomeUsuario('');
+    setEmailLogin('');
+    salvarDadosLocais({ logado: false, nomeUsuario: '' });
+    setTela('hub');
+  };
+
+  // ---------- GERAÇÃO DE TREINO ----------
   const gerarTreinoLocal = () => {
     const freq = Number(frequencia) || 3;
     const letras = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
     const obj = objetivo.toLowerCase();
 
-    const focos = obj.includes('perna') || obj.includes('inferior')
-      ? ['Pernas e Glúteos', 'Costas e Bíceps', 'Peito e Tríceps', 'Ombros e Core', 'Pernas (volume)', 'Cardio', 'Full Body']
-      : obj.includes('superior') || obj.includes('braço')
-      ? ['Peito e Tríceps', 'Costas e Bíceps', 'Ombros e Antebraço', 'Braços (isolados)', 'Full Body', 'Cardio', 'Core e Mobilidade']
-      : obj.includes('emagrec') || obj.includes('cardio')
-      ? ['Cardio + Core', 'Superiores Funcional', 'Inferiores Funcional', 'HIIT + Abdômen', 'Full Body Metabólico', 'Cardio Leve', 'Mobilidade']
-      : ['Peito e Tríceps', 'Costas e Bíceps', 'Pernas e Glúteos', 'Ombros e Core', 'Full Body', 'Cardio', 'Core e Mobilidade'];
+    const focos =
+      obj.includes('perna') || obj.includes('inferior')
+        ? ['Pernas e Glúteos', 'Costas e Bíceps', 'Peito e Tríceps', 'Ombros e Core', 'Pernas (volume)', 'Cardio', 'Full Body']
+        : obj.includes('superior') || obj.includes('braço')
+        ? ['Peito e Tríceps', 'Costas e Bíceps', 'Ombros e Antebraço', 'Braços (isolados)', 'Full Body', 'Cardio', 'Core e Mobilidade']
+        : obj.includes('emagrec') || obj.includes('cardio')
+        ? ['Cardio + Core', 'Superiores Funcional', 'Inferiores Funcional', 'HIIT + Abdômen', 'Full Body Metabólico', 'Cardio Leve', 'Mobilidade']
+        : ['Peito e Tríceps', 'Costas e Bíceps', 'Pernas e Glúteos', 'Ombros e Core', 'Full Body', 'Cardio', 'Core e Mobilidade'];
 
     const bases = {
       'Peito e Tríceps': `Aquecimento: 5 min\nSupino Reto 4x10\nSupino Inclinado 3x12\nCrucifixo 3x12\nTríceps Polia 4x12\nTríceps Mergulho 3x15\nAbdômen Prancha 3x1min\n\nTempo estimado: ${tempo} min`,
@@ -135,7 +191,7 @@ export default function App() {
       'Pernas e Glúteos': `Aquecimento: 5 min\nAgachamento Livre 4x10\nLeg Press 4x12\nCadeira Extensora 3x15\nCadeira Flexora 3x15\nStiff 3x12\nPanturrilha em pé 4x15\n\nTempo estimado: ${tempo} min`,
       'Ombros e Core': `Aquecimento: 5 min\nDesenvolvimento Halteres 4x10\nElevação Lateral 4x12\nElevação Frontal 3x12\nFace Pull 3x15\nPrancha 3x1min\nAbdômen Bicicleta 3x20\n\nTempo estimado: ${tempo} min`,
       'Full Body': `Aquecimento: 5 min\nAgachamento 3x10\nSupino 3x10\nRemada 3x10\nDesenvolvimento 3x10\nRosca Direta 2x12\nTríceps 2x12\nPrancha 2x1min\n\nTempo estimado: ${tempo} min`,
-      'Cardio': `Aquecimento: 5 min caminhada\nEsteira (corrida leve) 15 min\nBike Ergométrica 10 min\nAbdômen Supra 3x20\nPrancha 3x1min\nAlongamento final: 5 min\n\nTempo estimado: ${tempo} min`,
+      Cardio: `Aquecimento: 5 min caminhada\nEsteira (corrida leve) 15 min\nBike Ergométrica 10 min\nAbdômen Supra 3x20\nPrancha 3x1min\nAlongamento final: 5 min\n\nTempo estimado: ${tempo} min`,
       'Core e Mobilidade': `Aquecimento: 5 min\nPrancha Frontal 4x1min\nPrancha Lateral 3x45s\nInfra Solo 4x15\nBicicleta 3x20\nSérie de Alongamentos 15 min\n\nTempo estimado: ${tempo} min`,
     };
 
@@ -170,7 +226,7 @@ export default function App() {
 
       const response = await fetch(`${backendUrl}/gerar-treino-ia`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-Treino-Key': apiKey,
         },
@@ -182,7 +238,7 @@ export default function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Erro na API');
 
-      const lista = Array.isArray(data) ? data : (data.treino || []);
+      const lista = Array.isArray(data) ? data : data.treino || [];
       if (lista.length > 0) {
         setTreino(lista);
         salvarDadosLocais({
@@ -214,7 +270,7 @@ export default function App() {
     setLoadingHistorico(true);
     try {
       const response = await fetch(`${backendUrl}/historico/${userId}`, {
-        headers: { 'X-Treino-Key': apiKey }
+        headers: { 'X-Treino-Key': apiKey },
       });
       if (!response.ok) throw new Error('Não foi possível carregar o histórico');
       const data = await response.json();
@@ -223,20 +279,24 @@ export default function App() {
       console.warn('Erro ao carregar histórico:', error.message);
     } finally {
       setLoadingHistorico(false);
-      setExibirHistorico(true);
     }
   };
 
+  const abrirHistorico = () => {
+    setTela('historico');
+    carregarHistorico();
+  };
+
   const selecionarTreinoHistorico = (treinoHistorico) => {
-    const treinoFormatado = treinoHistorico.days.map(d => ({
+    const treinoFormatado = treinoHistorico.days.map((d) => ({
       dia: d.dia,
       foco: d.foco,
       exercicios: d.exercicios,
     }));
     setTreino(treinoFormatado);
-    setExibirHistorico(false);
     salvarDadosLocais({ treino: treinoFormatado });
-    Alert.alert('Sucesso', 'Treino selecionado carregado na tela principal!');
+    Alert.alert('Sucesso', 'Treino selecionado carregado!');
+    setTela('treino');
   };
 
   const limparTreino = () => {
@@ -259,7 +319,14 @@ export default function App() {
     });
   };
 
-  const exportarExcel = async () => {
+  // exportarExcel agora aceita um treino específico (usado na tela de Planilhas
+  // para exportar tanto o treino ativo quanto qualquer treino do histórico)
+  const exportarExcel = async (treinoParaExportar, nomeArquivo = 'Treino_Semanal') => {
+    const dadosTreino = treinoParaExportar || treino;
+    if (!dadosTreino || dadosTreino.length === 0) {
+      Alert.alert('Atenção', 'Não há treino para exportar.');
+      return;
+    }
     try {
       const workbook = XLSX.utils.book_new();
       const planilha = [];
@@ -269,7 +336,7 @@ export default function App() {
       planilha.push(['Frequência', `${frequencia}x por semana`, `Tempo por sessão: ${tempo} min`]);
       planilha.push(['', '', '']);
 
-      treino.forEach((dia) => {
+      dadosTreino.forEach((dia) => {
         planilha.push([dia.dia.toUpperCase(), dia.foco, '']);
         const linhas = (dia.exercicios || '').split('\n').filter(Boolean);
         linhas.forEach((linha) => planilha.push(['', linha, '']));
@@ -286,14 +353,14 @@ export default function App() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'Treino_Semanal.xlsx';
+        a.download = `${nomeArquivo}.xlsx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
+        const filePath = FileSystem.documentDirectory + `${nomeArquivo}.xlsx`;
         const wbout = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
-        const filePath = FileSystem.documentDirectory + 'Treino_Semanal.xlsx';
         await FileSystem.writeAsStringAsync(filePath, wbout, { encoding: FileSystem.EncodingType.Base64 });
         const podeCompartilhar = await Sharing.isAvailableAsync();
         if (podeCompartilhar) {
@@ -311,376 +378,610 @@ export default function App() {
     }
   };
 
+  // ---------- PERFIL / IMC ----------
+  const calcularIMC = () => {
+    const p = Number(peso);
+    const a = Number(altura) / 100;
+    if (!p || !a) return null;
+    return p / (a * a);
+  };
+
+  const classificarIMC = (imc) => {
+    if (imc < 18.5) return 'Abaixo do peso';
+    if (imc < 25) return 'Peso normal';
+    if (imc < 30) return 'Sobrepeso';
+    return 'Obesidade';
+  };
+
+  const imcAtual = calcularIMC();
+
   const formValido = objetivo.trim() && idade && peso && altura && frequencia;
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
-      
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : null}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+  // ---------- COMPONENTES AUXILIARES ----------
+
+  const BarChart = ({ dados, sufixo = '' }) => {
+    const maxValor = Math.max(...dados.map((d) => d.valor), 1);
+    return (
+      <View style={styles.chartRow}>
+        {dados.map((d, i) => (
+          <View key={i} style={styles.chartBarWrapper}>
+            <Text style={styles.chartValueLabel}>{d.valor}{sufixo}</Text>
+            <View style={styles.chartBarTrack}>
+              <View
+                style={[
+                  styles.chartBarFill,
+                  { height: `${Math.max((d.valor / maxValor) * 100, 4)}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.chartAxisLabel}>{d.label}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const HeaderPrincipal = () => (
+    <View style={styles.header}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.logoContainer}
+          onPress={() => setTela('hub')}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerRow}>
-              <View style={styles.logoContainer}>
-                <Image 
-                  source={require('./assets/logo.png')} 
-                  style={styles.logoImage} 
-                  resizeMode="contain"
-                />
+          <Image source={require('./assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+        </TouchableOpacity>
+
+        <View style={styles.headerIcons}>
+          {tela !== 'hub' && (
+            <TouchableOpacity style={styles.headerIconButton} onPress={() => setTela('hub')} activeOpacity={0.6}>
+              <Ionicons name="home-outline" size={24} color="#00FF66" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => setTela(logado ? 'perfil' : 'login')}
+            activeOpacity={0.6}
+          >
+            <Ionicons name={logado ? 'person-circle' : 'person-circle-outline'} size={30} color="#00FF66" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
+  const TelaVoltar = ({ titulo }) => (
+    <View style={styles.telaHeaderRow}>
+      <TouchableOpacity style={styles.voltarButton} onPress={() => setTela('hub')}>
+        <Ionicons name="arrow-back" size={20} color="#00FF66" />
+        <Text style={styles.voltarButtonText}>Hub</Text>
+      </TouchableOpacity>
+      <Text style={styles.telaHeaderTitle}>{titulo}</Text>
+      <View style={{ width: 60 }} />
+    </View>
+  );
+
+  // ---------- TELA: LOGIN ----------
+  const renderLogin = () => (
+    <View style={styles.inputSection}>
+      <View style={styles.loginIconWrap}>
+        <Ionicons name="person-circle-outline" size={72} color="#00FF66" />
+      </View>
+      <Text style={styles.loginTitle}>Entrar na sua conta</Text>
+      <Text style={styles.configHelp}>Acesse para salvar seu perfil e acompanhar sua evolução.</Text>
+
+      <Text style={styles.label}>E-mail</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="voce@email.com"
+        placeholderTextColor="#71717A"
+        value={emailLogin}
+        onChangeText={setEmailLogin}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
+
+      <View style={{ height: 16 }} />
+
+      <Text style={styles.label}>Senha</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="••••••••"
+        placeholderTextColor="#71717A"
+        value={senhaLogin}
+        onChangeText={setSenhaLogin}
+        secureTextEntry
+        autoCapitalize="none"
+      />
+
+      <TouchableOpacity style={[styles.button, { marginTop: 24 }]} onPress={fazerLogin}>
+        <Text style={styles.buttonText}>Entrar</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.buttonOutline} onPress={() => setTela('hub')}>
+        <Text style={styles.buttonOutlineText}>Continuar sem login</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // ---------- TELA: HUB (INÍCIO) ----------
+  const renderHub = () => (
+    <View style={styles.inputSection}>
+      <Text style={styles.hubGreeting}>
+        {logado ? `Olá, ${nomeUsuario}! 💪` : 'Bem-vindo(a)! 💪'}
+      </Text>
+      <Text style={styles.configHelp}>Aqui está um resumo do seu rendimento.</Text>
+
+      <View style={styles.chartCard}>
+        <Text style={styles.chartCardTitle}>Rendimento semanal</Text>
+        <BarChart dados={DADOS_DEMO_SEMANA} sufixo="%" />
+        <Text style={styles.chartDemoNote}>
+          📊 Dados de demonstração — gráficos reais aparecerão aqui assim que a checklist de treinos for
+          implementada.
+        </Text>
+      </View>
+
+      <View style={styles.chartCard}>
+        <Text style={styles.chartCardTitle}>Evolução de performance</Text>
+        <BarChart dados={DADOS_DEMO_EVOLUCAO} sufixo="%" />
+        <Text style={styles.chartDemoNote}>📊 Demonstrativo baseado nas últimas 6 semanas.</Text>
+      </View>
+
+      <Text style={[styles.label, { marginTop: 8 }]}>Menu</Text>
+      <View style={styles.hubGrid}>
+        <TouchableOpacity style={styles.hubCard} onPress={() => setTela('treino')} activeOpacity={0.75}>
+          <Ionicons name="barbell" size={26} color="#00FF66" />
+          <Text style={styles.hubCardText}>{treino ? 'Meu Treino Atual' : 'Gerar Treino'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.hubCard} onPress={abrirHistorico} activeOpacity={0.75}>
+          <Ionicons name="fitness" size={26} color="#00FF66" />
+          <Text style={styles.hubCardText}>Treinos Gerados</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.hubCard} onPress={() => setTela('planilhas')} activeOpacity={0.75}>
+          <Ionicons name="download" size={26} color="#00FF66" />
+          <Text style={styles.hubCardText}>Planilhas p/ Download</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.hubCard} onPress={() => setTela('config')} activeOpacity={0.75}>
+          <Ionicons name="settings" size={26} color="#00FF66" />
+          <Text style={styles.hubCardText}>Configurações</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.hubCard, { width: '100%' }]}
+          onPress={() => setTela(logado ? 'perfil' : 'login')}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="person" size={26} color="#00FF66" />
+          <Text style={styles.hubCardText}>Minhas Informações</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // ---------- TELA: GERAR TREINO ----------
+  const renderTreino = () => (
+    <View>
+      <TelaVoltar titulo="Treino" />
+      {!treino ? (
+        <View style={styles.inputSection}>
+          <Text style={styles.label}>Qual o seu objetivo?</Text>
+          <TextInput
+            style={styles.inputArea}
+            placeholder="Ex: Quero hipertrofia e ganho de massa..."
+            placeholderTextColor="#71717A"
+            multiline
+            numberOfLines={3}
+            value={objetivo}
+            onChangeText={(text) => {
+              setObjetivo(text);
+              salvarDadosLocais({ objetivo: text });
+            }}
+          />
+
+          <View style={styles.row}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.labelSmall}>Idade</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="25"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={idade}
+                onChangeText={(text) => {
+                  setIdade(text);
+                  salvarDadosLocais({ idade: text });
+                }}
+              />
+            </View>
+            <View style={[styles.inputGroup, { marginLeft: 12 }]}>
+              <Text style={styles.labelSmall}>Peso (kg)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="75"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={peso}
+                onChangeText={(text) => {
+                  setPeso(text);
+                  salvarDadosLocais({ peso: text });
+                }}
+              />
+            </View>
+            <View style={[styles.inputGroup, { marginLeft: 12 }]}>
+              <Text style={styles.labelSmall}>Altura (cm)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="175"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={altura}
+                onChangeText={(text) => {
+                  setAltura(text);
+                  salvarDadosLocais({ altura: text });
+                }}
+              />
+            </View>
+          </View>
+
+          <View style={styles.daysContainer}>
+            <Text style={styles.label}>Dias de treino por semana</Text>
+
+            <TouchableOpacity style={styles.dropdownHeader} onPress={() => setDiasAberto(!diasAberto)} activeOpacity={0.7}>
+              <Text style={styles.dropdownHeaderText}>
+                {frequencia} {frequencia === '1' ? 'dia por semana' : 'dias por semana'}
+              </Text>
+              <Ionicons name={diasAberto ? 'chevron-up' : 'chevron-down'} size={20} color="#00FF66" />
+            </TouchableOpacity>
+
+            {diasAberto && (
+              <View style={styles.dropdownList}>
+                {['1', '2', '3', '4', '5', '6', '7'].map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.dropdownItem, frequencia === d && styles.dropdownItemActive]}
+                    onPress={() => {
+                      setFrequencia(d);
+                      salvarDadosLocais({ frequencia: d });
+                      setDiasAberto(false);
+                    }}
+                  >
+                    <Text style={[styles.dropdownItemText, frequencia === d && styles.dropdownItemTextActive]}>
+                      {d} {d === '1' ? 'dia ' : 'dias '}
+                    </Text>
+                    {frequencia === d && <Ionicons name="checkmark" size={18} color="#00FF66" />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.sliderContainer}>
+            <Text style={styles.label}>Tempo por treino</Text>
+            <View style={styles.timeSelector}>
+              <TouchableOpacity
+                style={styles.timeButton}
+                onPress={() => {
+                  const novo = Math.max(15, tempo - 5);
+                  setTempo(novo);
+                  salvarDadosLocais({ tempo: novo });
+                }}
+              >
+                <Text style={styles.timeButtonText}>-</Text>
+              </TouchableOpacity>
+
+              <View style={styles.timeValueContainer}>
+                <Text style={styles.timeValueText}>{tempo}</Text>
+                <Text style={styles.timeLabelText}>min</Text>
               </View>
 
-              <TouchableOpacity 
-                style={styles.menuIconButton} 
-                onPress={() => setMostrarMenu(true)}
-                activeOpacity={0.6}
+              <TouchableOpacity
+                style={styles.timeButton}
+                onPress={() => {
+                  const novo = Math.min(120, tempo + 5);
+                  setTempo(novo);
+                  salvarDadosLocais({ tempo: novo });
+                }}
               >
-                <Ionicons name="menu" size={28} color="#00FF66" />
+                <Text style={styles.timeButtonText}>+</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* GAVETA LATERAL (LARGURA AJUSTADA AO TAMANHO DO BOTÃO) */}
-          <Modal
-            visible={mostrarMenu}
-            animationType="fade"
-            transparent={true}
-            onRequestClose={() => setMostrarMenu(false)}
+          <TouchableOpacity
+            style={[styles.button, !formValido && styles.buttonDisabled]}
+            onPress={gerarTreino}
+            disabled={!formValido || loading}
           >
-            <TouchableOpacity 
-              style={styles.drawerOverlay} 
-              activeOpacity={1} 
-              onPress={() => setMostrarMenu(false)}
-            >
-              <View style={styles.drawerContent} onStartShouldSetResponder={() => true}>
-                <View style={styles.drawerHeader}>
-                  <Text style={styles.drawerTitle}>Menu</Text>
-                  <TouchableOpacity onPress={() => setMostrarMenu(false)}>
-                    <Ionicons name="close" size={24} color="#A1A1AA" />
-                  </TouchableOpacity>
+            {loading ? <ActivityIndicator color="#121212" size="small" /> : <Text style={styles.buttonText}>Gerar Meu Treino</Text>}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.resultSection}>
+          <Text style={styles.successTitle}>Treino Ativo Gerado!</Text>
+          <Text style={styles.successSubtitle}>
+            Foco: {tempo} min | Frequência: {frequencia}x na semana
+          </Text>
+
+          {treino.map((diaInfo, index) => (
+            <View key={index} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardDay}>{diaInfo.dia}</Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{diaInfo.foco}</Text>
                 </View>
-
-                {/* Opções ajustadas com limite e sem sobras */}
-                <TouchableOpacity 
-                  style={styles.drawerItem}
-                  onPress={() => {
-                    setMostrarMenu(false);
-                    setMostrarConfigRede(true);
-                  }}
-                >
-                  <Ionicons name="wifi-sharp" size={20} color="#00FF66" style={{ marginRight: 10 }} />
-                  <View style={{ flexShrink: 1 }}>
-                    <Text style={styles.drawerItemText}>Configurações de Rede</Text>
-                    <Text style={styles.drawerItemSubtext}>Servidor API e Chaves</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.drawerItem}
-                  onPress={() => {
-                    setMostrarMenu(false);
-                    carregarHistorico();
-                  }}
-                >
-                  <Ionicons name="fitness-sharp" size={20} color="#00FF66" style={{ marginRight: 10 }} />
-                  <View style={{ flexShrink: 1 }}>
-                    <Text style={styles.drawerItemText}>Meus Treinos Gerados</Text>
-                    <Text style={styles.drawerItemSubtext}>Histórico salvo</Text>
-                  </View>
-                </TouchableOpacity>
               </View>
+              <Text style={styles.cardExercises}>{diaInfo.exercicios}</Text>
+            </View>
+          ))}
+
+          <TouchableOpacity style={styles.buttonExcel} onPress={() => exportarExcel(treino)}>
+            <Text style={styles.buttonExcelText}>📥  Baixar Planilha Excel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.buttonOutline} onPress={limparTreino}>
+            <Text style={styles.buttonOutlineText}>Ajustar Perfil</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  // ---------- TELA: TREINOS GERADOS (HISTÓRICO) ----------
+  const renderHistorico = () => (
+    <View>
+      <TelaVoltar titulo="Treinos Gerados" />
+      <View style={styles.inputSection}>
+        {loadingHistorico ? (
+          <ActivityIndicator color="#00FF66" size="large" style={{ marginVertical: 30 }} />
+        ) : historico.length === 0 ? (
+          <View style={{ alignItems: 'center', marginVertical: 20 }}>
+            <Ionicons name="barbell-outline" size={40} color="#71717A" />
+            <Text style={styles.historicoVazio}>Nenhum treino salvo no servidor.</Text>
+          </View>
+        ) : (
+          historico.map((h, i) => (
+            <View key={i} style={styles.historicoCard}>
+              <View>
+                <Text style={styles.historicoCardDate}>{new Date(h.created_at).toLocaleDateString('pt-BR')}</Text>
+                <Text style={styles.historicoCardDetails}>{h.days ? h.days.length : 0} sessões divididas</Text>
+              </View>
+              <TouchableOpacity style={styles.historicoLoadBtn} onPress={() => selecionarTreinoHistorico(h)}>
+                <Text style={styles.historicoLoadBtnText}>Carregar</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
+
+  // ---------- TELA: PLANILHAS PARA DOWNLOAD ----------
+  const renderPlanilhas = () => (
+    <View>
+      <TelaVoltar titulo="Planilhas" />
+      <View style={styles.inputSection}>
+        <Text style={styles.configHelp}>Baixe seus treinos em formato Excel (.xlsx).</Text>
+
+        {treino ? (
+          <View style={styles.historicoCard}>
+            <View style={{ flexShrink: 1 }}>
+              <Text style={styles.historicoCardDate}>Treino Ativo</Text>
+              <Text style={styles.historicoCardDetails}>{treino.length} dias | {frequencia}x por semana</Text>
+            </View>
+            <TouchableOpacity style={styles.historicoLoadBtn} onPress={() => exportarExcel(treino, 'Treino_Ativo')}>
+              <Text style={styles.historicoLoadBtnText}>Baixar</Text>
             </TouchableOpacity>
-          </Modal>
+          </View>
+        ) : (
+          <View style={{ alignItems: 'center', marginVertical: 12 }}>
+            <Ionicons name="document-text-outline" size={36} color="#71717A" />
+            <Text style={styles.historicoVazio}>Nenhum treino ativo no momento.</Text>
+          </View>
+        )}
 
-          {/* MODAL 1: Configurações de Rede */}
-          <Modal
-            visible={mostrarConfigRede}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setMostrarConfigRede(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Configurações de Rede</Text>
-                  <TouchableOpacity onPress={() => setMostrarConfigRede(false)}>
-                    <Ionicons name="close-circle" size={26} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView style={styles.modalBody}>
-                  <Text style={styles.configLabel}>IP / URL do Servidor API</Text>
-                  <TextInput
-                    style={styles.configInput}
-                    placeholder="http://localhost:8000"
-                    placeholderTextColor="#71717A"
-                    value={backendUrl}
-                    onChangeText={(text) => {
-                      setBackendUrl(text);
-                      salvarDadosLocais({ backendUrl: text });
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  
-                  <Text style={styles.configLabel}>Chave da API (Opcional)</Text>
-                  <TextInput
-                    style={styles.configInput}
-                    placeholder="Insira sua chave de API aqui"
-                    placeholderTextColor="#71717A"
-                    value={apiKey}
-                    onChangeText={(text) => {
-                      setApiKey(text);
-                      salvarDadosLocais({ apiKey: text });
-                    }}
-                    secureTextEntry={true}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  
-                  <Text style={styles.configHelp}>
-                    ID do Dispositivo: <Text style={styles.uuidText}>{userId}</Text>
-                  </Text>
-                </ScrollView>
+        <Text style={[styles.label, { marginTop: 10 }]}>Histórico</Text>
+        {loadingHistorico ? (
+          <ActivityIndicator color="#00FF66" size="large" style={{ marginVertical: 20 }} />
+        ) : historico.length === 0 ? (
+          <Text style={styles.historicoVazio}>Nenhum treino no histórico para baixar.</Text>
+        ) : (
+          historico.map((h, i) => (
+            <View key={i} style={styles.historicoCard}>
+              <View>
+                <Text style={styles.historicoCardDate}>{new Date(h.created_at).toLocaleDateString('pt-BR')}</Text>
+                <Text style={styles.historicoCardDetails}>{h.days ? h.days.length : 0} sessões divididas</Text>
               </View>
-            </View>
-          </Modal>
-
-          {/* MODAL 2: Meus Treinos Gerados */}
-          <Modal
-            visible={exibirHistorico}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setExibirHistorico(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Meus Treinos Gerados</Text>
-                  <TouchableOpacity onPress={() => setExibirHistorico(false)}>
-                    <Ionicons name="close-circle" size={26} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-
-                {loadingHistorico ? (
-                  <ActivityIndicator color="#00FF66" size="large" style={{ marginVertical: 30 }} />
-                ) : (
-                  <ScrollView style={styles.modalBody}>
-                    {historico.length === 0 ? (
-                      <View style={{ alignItems: 'center', marginVertical: 20 }}>
-                        <Ionicons name="barbell-outline" size={40} color="#71717A" />
-                        <Text style={styles.historicoVazio}>Nenhum treino salvo no servidor.</Text>
-                      </View>
-                    ) : (
-                      historico.map((h, i) => (
-                        <View key={i} style={styles.historicoCard}>
-                          <View>
-                            <Text style={styles.historicoCardDate}>
-                              {new Date(h.created_at).toLocaleDateString('pt-BR')}
-                            </Text>
-                            <Text style={styles.historicoCardDetails}>
-                              {h.days ? h.days.length : 0} sessões divididas
-                            </Text>
-                          </View>
-                          <TouchableOpacity 
-                            style={styles.historicoLoadBtn} 
-                            onPress={() => selecionarTreinoHistorico(h)}
-                          >
-                            <Text style={styles.historicoLoadBtnText}>Carregar</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ))
-                    )}
-                  </ScrollView>
-                )}
-              </View>
-            </View>
-          </Modal>
-
-          {/* Formulário Principal */}
-          {!treino ? (
-            <View style={styles.inputSection}>
-              <Text style={styles.label}>Qual o seu objetivo?</Text>
-              <TextInput
-                style={styles.inputArea}
-                placeholder="Ex: Quero hipertrofia e ganho de massa..."
-                placeholderTextColor="#71717A"
-                multiline
-                numberOfLines={3}
-                value={objetivo}
-                onChangeText={(text) => {
-                  setObjetivo(text);
-                  salvarDadosLocais({ objetivo: text });
-                }}
-              />
-
-              <View style={styles.row}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.labelSmall}>Idade</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="25"
-                    placeholderTextColor="#71717A"
-                    keyboardType="numeric"
-                    value={idade}
-                    onChangeText={(text) => {
-                      setIdade(text);
-                      salvarDadosLocais({ idade: text });
-                    }}
-                  />
-                </View>
-                <View style={[styles.inputGroup, { marginLeft: 12 }]}>
-                  <Text style={styles.labelSmall}>Peso (kg)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="75"
-                    placeholderTextColor="#71717A"
-                    keyboardType="numeric"
-                    value={peso}
-                    onChangeText={(text) => {
-                      setPeso(text);
-                      salvarDadosLocais({ peso: text });
-                    }}
-                  />
-                </View>
-                <View style={[styles.inputGroup, { marginLeft: 12 }]}>
-                  <Text style={styles.labelSmall}>Altura (cm)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="175"
-                    placeholderTextColor="#71717A"
-                    keyboardType="numeric"
-                    value={altura}
-                    onChangeText={(text) => {
-                      setAltura(text);
-                      salvarDadosLocais({ altura: text });
-                    }}
-                  />
-                </View>
-              </View>
-
-              {/* SELETOR RETRÁTIL DE DIAS (DROPDOWN) */}
-              <View style={styles.daysContainer}>
-                <Text style={styles.label}>Dias de treino por semana</Text>
-                
-                <TouchableOpacity
-                  style={styles.dropdownHeader}
-                  onPress={() => setDiasAberto(!diasAberto)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.dropdownHeaderText}>
-                    {frequencia} {frequencia === '1' ? 'dia por semana' : 'dias por semana'}
-                  </Text>
-                  <Ionicons 
-                    name={diasAberto ? "chevron-up" : "chevron-down"} 
-                    size={20} 
-                    color="#00FF66" 
-                  />
-                </TouchableOpacity>
-
-                {diasAberto && (
-                  <View style={styles.dropdownList}>
-                    {['1', '2', '3', '4', '5', '6', '7'].map((d) => (
-                      <TouchableOpacity
-                        key={d}
-                        style={[styles.dropdownItem, frequencia === d && styles.dropdownItemActive]}
-                        onPress={() => {
-                          setFrequencia(d);
-                          salvarDadosLocais({ frequencia: d });
-                          setDiasAberto(false);
-                        }}
-                      >
-                        <Text style={[styles.dropdownItemText, frequencia === d && styles.dropdownItemTextActive]}>
-                          {d} {d === '1' ? 'dia ' : 'dias '}
-                        </Text>
-                        {frequencia === d && (
-                          <Ionicons name="checkmark" size={18} color="#00FF66" />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.sliderContainer}>
-                <Text style={styles.label}>Tempo por treino</Text>
-                <View style={styles.timeSelector}>
-                  <TouchableOpacity 
-                    style={styles.timeButton}
-                    onPress={() => {
-                      const novo = Math.max(15, tempo - 5);
-                      setTempo(novo);
-                      salvarDadosLocais({ tempo: novo });
-                    }}
-                  >
-                    <Text style={styles.timeButtonText}>-</Text>
-                  </TouchableOpacity>
-                  
-                  <View style={styles.timeValueContainer}>
-                    <Text style={styles.timeValueText}>{tempo}</Text>
-                    <Text style={styles.timeLabelText}>min</Text>
-                  </View>
-
-                  <TouchableOpacity 
-                    style={styles.timeButton}
-                    onPress={() => {
-                      const novo = Math.min(120, tempo + 5);
-                      setTempo(novo);
-                      salvarDadosLocais({ tempo: novo });
-                    }}
-                  >
-                    <Text style={styles.timeButtonText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <TouchableOpacity 
-                style={[styles.button, !formValido && styles.buttonDisabled]} 
-                onPress={gerarTreino}
-                disabled={!formValido || loading}
+              <TouchableOpacity
+                style={styles.historicoLoadBtn}
+                onPress={() =>
+                  exportarExcel(
+                    h.days.map((d) => ({ dia: d.dia, foco: d.foco, exercicios: d.exercicios })),
+                    `Treino_${new Date(h.created_at).toLocaleDateString('pt-BR').replace(/\//g, '-')}`
+                  )
+                }
               >
-                {loading ? (
-                  <ActivityIndicator color="#121212" size="small" />
-                ) : (
-                  <Text style={styles.buttonText}>Gerar Meu Treino</Text>
-                )}
+                <Text style={styles.historicoLoadBtnText}>Baixar</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            /* Resultados */
-            <View style={styles.resultSection}>
-              <Text style={styles.successTitle}>Treino Ativo Gerado!</Text>
-              <Text style={styles.successSubtitle}>Foco: {tempo} min | Frequência: {frequencia}x na semana</Text>
-              
-              {treino.map((diaInfo, index) => (
-                <View key={index} style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardDay}>{diaInfo.dia}</Text>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{diaInfo.foco}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.cardExercises}>{diaInfo.exercicios}</Text>
-                </View>
-              ))}
+          ))
+        )}
 
-              <TouchableOpacity style={styles.buttonExcel} onPress={exportarExcel}>
-                <Text style={styles.buttonExcelText}>📥  Baixar Planilha Excel</Text>
-              </TouchableOpacity>
+        {!loadingHistorico && (
+          <TouchableOpacity style={styles.buttonOutline} onPress={carregarHistorico}>
+            <Text style={styles.buttonOutlineText}>Atualizar histórico</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
 
-              <TouchableOpacity style={styles.buttonOutline} onPress={limparTreino}>
-                <Text style={styles.buttonOutlineText}>Ajustar Perfil</Text>
-              </TouchableOpacity>
+  // ---------- TELA: CONFIGURAÇÕES ----------
+  const renderConfig = () => (
+    <View>
+      <TelaVoltar titulo="Configurações" />
+      <View style={styles.inputSection}>
+        <Text style={styles.configLabel}>IP / URL do Servidor API</Text>
+        <TextInput
+          style={styles.configInput}
+          placeholder="http://localhost:8000"
+          placeholderTextColor="#71717A"
+          value={backendUrl}
+          onChangeText={(text) => {
+            setBackendUrl(text);
+            salvarDadosLocais({ backendUrl: text });
+          }}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+
+        <Text style={[styles.configLabel, { marginTop: 16 }]}>Chave da API (Opcional)</Text>
+        <TextInput
+          style={styles.configInput}
+          placeholder="Insira sua chave de API aqui"
+          placeholderTextColor="#71717A"
+          value={apiKey}
+          onChangeText={(text) => {
+            setApiKey(text);
+            salvarDadosLocais({ apiKey: text });
+          }}
+          secureTextEntry={true}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+
+        <Text style={styles.configHelp}>
+          ID do Dispositivo: <Text style={styles.uuidText}>{userId}</Text>
+        </Text>
+
+        {logado && (
+          <TouchableOpacity style={[styles.buttonOutline, { marginTop: 20 }]} onPress={fazerLogout}>
+            <Text style={styles.buttonOutlineText}>Sair da conta</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  // ---------- TELA: MINHAS INFORMAÇÕES (PERFIL) ----------
+  const renderPerfil = () => {
+    if (!logado) {
+      return renderLogin();
+    }
+    return (
+      <View>
+        <TelaVoltar titulo="Minhas Informações" />
+        <View style={styles.inputSection}>
+          <View style={styles.loginIconWrap}>
+            <Ionicons name="person-circle" size={72} color="#00FF66" />
+          </View>
+          <Text style={styles.hubGreeting}>{nomeUsuario}</Text>
+
+          {imcAtual && (
+            <View style={styles.imcCard}>
+              <Text style={styles.imcLabel}>Seu IMC atual</Text>
+              <Text style={styles.imcValue}>{imcAtual.toFixed(1)}</Text>
+              <Text style={styles.imcClassificacao}>{classificarIMC(imcAtual)}</Text>
             </View>
           )}
 
+          <Text style={styles.label}>Objetivo</Text>
+          <TextInput
+            style={styles.inputArea}
+            placeholder="Ex: Quero hipertrofia e ganho de massa..."
+            placeholderTextColor="#71717A"
+            multiline
+            numberOfLines={3}
+            value={objetivo}
+            onChangeText={(text) => {
+              setObjetivo(text);
+              salvarDadosLocais({ objetivo: text });
+            }}
+          />
+
+          <View style={styles.row}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.labelSmall}>Idade</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="25"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={idade}
+                onChangeText={(text) => {
+                  setIdade(text);
+                  salvarDadosLocais({ idade: text });
+                }}
+              />
+            </View>
+            <View style={[styles.inputGroup, { marginLeft: 12 }]}>
+              <Text style={styles.labelSmall}>Peso (kg)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="75"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={peso}
+                onChangeText={(text) => {
+                  setPeso(text);
+                  salvarDadosLocais({ peso: text });
+                }}
+              />
+            </View>
+            <View style={[styles.inputGroup, { marginLeft: 12 }]}>
+              <Text style={styles.labelSmall}>Altura (cm)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="175"
+                placeholderTextColor="#71717A"
+                keyboardType="numeric"
+                value={altura}
+                onChangeText={(text) => {
+                  setAltura(text);
+                  salvarDadosLocais({ altura: text });
+                }}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.buttonOutline} onPress={fazerLogout}>
+            <Text style={styles.buttonOutlineText}>Sair da conta</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderConteudo = () => {
+    switch (tela) {
+      case 'login':
+        return renderLogin();
+      case 'treino':
+        return renderTreino();
+      case 'historico':
+        return renderHistorico();
+      case 'planilhas':
+        return renderPlanilhas();
+      case 'config':
+        return renderConfig();
+      case 'perfil':
+        return renderPerfil();
+      case 'hub':
+      default:
+        return renderHub();
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : null}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <HeaderPrincipal />
+          {renderConteudo()}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -719,60 +1020,138 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  menuIconButton: {
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconButton: {
     padding: 6,
+    marginLeft: 6,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // GAVETA LATERAL AJUSTADA (Sem tamanho fixo de 50%/65%)
-  drawerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  drawerContent: {
-    backgroundColor: '#1A1A1A',
-    height: '100%',
+  // NAVEGAÇÃO DE TELA (BOTÃO VOLTAR)
+  telaHeaderRow: {
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderLeftWidth: 1,
-    borderLeftColor: '#27272A',
-    maxWidth: '80%', // Limite máximo para não cobrir a tela toda
-  },
-  drawerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
+    marginBottom: 8,
   },
-  drawerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  drawerItem: {
+  voltarButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingRight: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
   },
-  drawerItemText: {
-    color: '#FFFFFF',
+  voltarButtonText: {
+    color: '#00FF66',
     fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  telaHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  drawerItemSubtext: {
+  // LOGIN
+  loginIconWrap: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  loginTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  // HUB
+  hubGreeting: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  hubGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  hubCard: {
+    width: '48%',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  hubCardText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 10,
+  },
+  // GRÁFICOS (DEMONSTRATIVOS)
+  chartCard: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  chartCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 14,
+  },
+  chartRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 120,
+  },
+  chartBarWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: '100%',
+  },
+  chartValueLabel: {
+    color: '#71717A',
+    fontSize: 9,
+    marginBottom: 4,
+  },
+  chartBarTrack: {
+    width: 14,
+    flex: 1,
+    backgroundColor: '#27272A',
+    borderRadius: 6,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  chartBarFill: {
+    width: '100%',
+    backgroundColor: '#00FF66',
+    borderRadius: 6,
+  },
+  chartAxisLabel: {
+    color: '#A1A1AA',
+    fontSize: 10,
+    marginTop: 6,
+  },
+  chartDemoNote: {
     color: '#71717A',
     fontSize: 11,
-    marginTop: 2,
+    marginTop: 12,
+    lineHeight: 16,
   },
-  // MODAIS
+  // MODAIS / TELAS
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -786,23 +1165,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27272A',
     maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
-    paddingBottom: 10,
-  },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  modalBody: {
-    marginBottom: 10,
   },
   configLabel: {
     color: '#A1A1AA',
@@ -824,6 +1186,7 @@ const styles = StyleSheet.create({
     color: '#71717A',
     fontSize: 12,
     marginBottom: 16,
+    textAlign: 'center',
   },
   uuidText: {
     color: '#00FF66',
@@ -908,6 +1271,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     borderWidth: 1,
     borderColor: '#27272A',
+  },
+  // IMC
+  imcCard: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  imcLabel: {
+    color: '#A1A1AA',
+    fontSize: 13,
+  },
+  imcValue: {
+    color: '#00FF66',
+    fontSize: 34,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  imcClassificacao: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
   },
   // DROPDOWN RETRÁTIL
   daysContainer: {
