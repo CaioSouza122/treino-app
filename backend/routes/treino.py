@@ -12,27 +12,26 @@ import uuid
 router = APIRouter()
 
 @router.get("/testar-api-flask")
-async def testar_api_flask(x_treino_key: Optional[str] = Header(None)):
+async def testar_api_flask():
     """
     Diagnóstico: testa a conexão com a API Flask externa e retorna o resultado detalhado.
     Acesse http://localhost:8000/testar-api-flask no navegador para verificar.
     """
-    resultado = await testar_conexao_flask(api_key_override=x_treino_key)
+    resultado = await testar_conexao_flask()
     return resultado
 
 
 @router.post("/gerar-treino-ia")
 async def gerar_treino(
     dados: TreinoRequest, 
-    db: AsyncSession = Depends(get_db),
-    x_treino_key: Optional[str] = Header(None)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Gera treino personalizado usando IA (com fallback automático) e salva no banco de dados.
     """
     # 1. Gera o treino via IA ou fallback local
     try:
-        resultado = gerar_treino_ia(dados, api_key_override=x_treino_key)
+        resultado = gerar_treino_ia(dados)
         if not resultado:
             raise HTTPException(status_code=500, detail="Não foi possível gerar o treino")
     except Exception as e:

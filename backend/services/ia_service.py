@@ -4,12 +4,13 @@ import hashlib
 import asyncio
 import httpx
 from datetime import datetime, timedelta
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# URL base da API Flask de treinos
-TREINO_API_URL = os.getenv("TREINO_API_URL", "http://localhost:5000/api/v1")
+# URL base da API de treinos no Render
+TREINO_API_URL = os.getenv("TREINO_API_URL", "https://api-treino-ygh4.onrender.com/api/v1")
 TREINO_API_KEY = os.getenv("TREINO_API_KEY", "")
 
 # Cache simples para evitar chamadas repetidas (1 hora)
@@ -17,11 +18,10 @@ _cache = {}
 _cache_tempo = {}
 
 
-def gerar_treino_ia(dados, api_key_override=None):
+def gerar_treino_ia(dados):
     """
-    Gera treino personalizado chamando a API Flask externa (que usa o Gemini internamente).
-    Faz fallback para gerador local caso a API esteja inacessível.
-    Roda em thread pool para não bloquear o event loop do FastAPI.
+    Gera treino personalizado chamando a API no Render (que usa o Gemini internamente).
+    Faz fallback para None caso a API esteja inacessível.
     """
     try:
         chave = hashlib.md5(str(dados.__dict__).encode()).hexdigest()
@@ -30,27 +30,27 @@ def gerar_treino_ia(dados, api_key_override=None):
             print("📦 Usando resposta do cache")
             return _cache[chave]
 
-        resposta = _chamar_api_externa_sync(dados, api_key_override=api_key_override)
+        resposta = _chamar_api_externa_sync(dados)
 
         if resposta:
             _cache[chave] = resposta
             _cache_tempo[chave] = datetime.now() + timedelta(hours=1)
             return resposta
 
-        print("⚠️ API externa não respondeu corretamente. Usando fallback local.")
-        return _gerar_fallback(dados)
+        print("⚠️ API externa não respondeu corretamente.")
+        return None
 
     except Exception as e:
         print(f"❌ Erro geral: {e}")
-        return _gerar_fallback(dados)
+        return None
 
 
-def _chamar_api_externa_sync(dados, api_key_override=None):
+def _chamar_api_externa_sync(dados):
     """
-    Chama o endpoint POST /api/v1/treino da API Flask do usuário de forma síncrona.
+    Chama o endpoint POST /api/v1/treino da API no Render de forma síncrona.
     """
     headers = {"Content-Type": "application/json"}
-    chave_api = api_key_override if api_key_override is not None else TREINO_API_KEY
+    chave_api = TREINO_API_KEY
     if chave_api:
         headers["X-API-KEY"] = chave_api
 
@@ -60,11 +60,11 @@ def _chamar_api_externa_sync(dados, api_key_override=None):
     }
 
     url = f"{TREINO_API_URL}/treino"
-    print(f"🔗 Chamando API Flask: {url}")
+    print(f"🔗 Chamando API Render: {url}")
     print(f"📤 Payload: {payload}")
 
     try:
-        with httpx.Client(timeout=20.0) as client:
+        with httpx.Client(timeout=60.0) as client:
             response = client.post(url, json=payload, headers=headers)
 
         print(f"📥 Status: {response.status_code}")
@@ -75,12 +75,12 @@ def _chamar_api_externa_sync(dados, api_key_override=None):
             return None
 
         if response.status_code == 429:
-            print(f"⏱️ Rate limit atingido na API Flask (5 por minuto). Aguarde.")
+            print(f"⏱️ Rate limit atingido. Aguarde.")
             return None
 
         response.raise_for_status()
         data = response.json()
-        print(f"✅ API Flask respondeu: {list(data.keys())}")
+        print(f"✅ API Render respondeu: {list(data.keys())}")
 
         treino_texto = data.get("treino_gerado", "")
         if not treino_texto:
@@ -93,7 +93,7 @@ def _chamar_api_externa_sync(dados, api_key_override=None):
         print(f"❌ Não conseguiu conectar em {url}: {e}")
         return None
     except httpx.TimeoutException:
-        print(f"⏳ Timeout ao chamar {url}")
+        print(f"⏳ Timeout ao chamar {url} (API pode estar dormindo no Render free tier)")
         return None
     except httpx.HTTPStatusError as e:
         print(f"❌ Erro HTTP {e.response.status_code}: {e.response.text}")
@@ -103,12 +103,12 @@ def _chamar_api_externa_sync(dados, api_key_override=None):
         return None
 
 
-async def testar_conexao_flask(api_key_override=None):
+async def testar_conexao_flask():
     """
-    Testa a conexão com a API Flask e retorna um diagnóstico detalhado.
+    Testa a conexão com a API no Render e retorna um diagnóstico detalhado.
     """
     url = f"{TREINO_API_URL}/health"
-    chave_api = api_key_override if api_key_override is not None else TREINO_API_KEY
+    chave_api = TREINO_API_KEY
     resultado = {
         "url_configurada": TREINO_API_URL,
         "api_key_configurada": bool(chave_api),
@@ -122,7 +122,7 @@ async def testar_conexao_flask(api_key_override=None):
         if chave_api:
             headers["X-API-KEY"] = chave_api
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             # Testa o health check
             try:
                 r = await client.get(url, headers=headers)
@@ -155,7 +155,7 @@ async def testar_conexao_flask(api_key_override=None):
 
 def _converter_texto_para_dias(treino_texto: str, dados) -> list:
     """
-    Converte o texto livre retornado pela API Flask para o formato de array de dias
+    Converte o texto livre retornado pela API para o formato de array de dias
     que o app mobile espera: [{ "dia", "foco", "exercicios" }]
     """
     frequencia = dados.vezes_por_semana or 3
@@ -199,65 +199,6 @@ def _converter_texto_para_dias(treino_texto: str, dados) -> list:
             }
             for i in range(frequencia)
         ]
-
-
-def _gerar_fallback(dados):
-    """
-    Gera treino baseado em regras quando a API externa não está disponível.
-    """
-    objetivo = dados.objetivo.lower() if dados.objetivo else "hipertrofia"
-    nivel = dados.nivel.lower() if dados.nivel else "intermediario"
-    frequencia = dados.vezes_por_semana if dados.vezes_por_semana else 3
-    tempo = dados.tempo if dados.tempo else 30
-
-    exercicios_db = {
-        "hipertrofia": {
-            "iniciante": [
-                {"exercicio": "Supino reto", "series": 3, "repeticoes": "10-12", "descanso": "60s"},
-                {"exercicio": "Puxada frontal", "series": 3, "repeticoes": "10-12", "descanso": "60s"},
-                {"exercicio": "Agachamento", "series": 3, "repeticoes": "12-15", "descanso": "60s"},
-                {"exercicio": "Desenvolvimento", "series": 3, "repeticoes": "10-12", "descanso": "60s"},
-                {"exercicio": "Rosca direta", "series": 3, "repeticoes": "12-15", "descanso": "45s"},
-            ],
-            "intermediario": [
-                {"exercicio": "Supino inclinado", "series": 4, "repeticoes": "8-10", "descanso": "75s"},
-                {"exercicio": "Remada curvada", "series": 4, "repeticoes": "8-10", "descanso": "75s"},
-                {"exercicio": "Leg press", "series": 4, "repeticoes": "10-12", "descanso": "75s"},
-                {"exercicio": "Elevação lateral", "series": 3, "repeticoes": "12-15", "descanso": "45s"},
-                {"exercicio": "Tríceps pulley", "series": 3, "repeticoes": "12-15", "descanso": "45s"},
-            ],
-            "avancado": [
-                {"exercicio": "Supino reto pesado", "series": 5, "repeticoes": "6-8", "descanso": "90s"},
-                {"exercicio": "Barra fixa", "series": 5, "repeticoes": "6-8", "descanso": "90s"},
-                {"exercicio": "Agachamento livre", "series": 5, "repeticoes": "8-10", "descanso": "90s"},
-                {"exercicio": "Desenvolvimento militar", "series": 4, "repeticoes": "8-10", "descanso": "75s"},
-                {"exercicio": "Rosca alternada", "series": 4, "repeticoes": "10-12", "descanso": "60s"},
-            ],
-        },
-    }
-
-    obj_key = "hipertrofia"
-    for k in exercicios_db:
-        if k in objetivo:
-            obj_key = k
-            break
-
-    nivel_exercicios = exercicios_db[obj_key].get(nivel, exercicios_db[obj_key]["iniciante"])
-
-    exercicios_texto = "Aquecimento: 5 min\n"
-    for ex in nivel_exercicios:
-        exercicios_texto += f"{ex['exercicio']} {ex['series']}x{ex['repeticoes']} (Desc: {ex['descanso']})\n"
-    exercicios_texto += f"\nTempo estimado: {tempo} min"
-
-    letras = ['A', 'B', 'C', 'D', 'E', 'F']
-    return [
-        {
-            "dia": f"Treino {letras[i]}",
-            "foco": f"{objetivo.capitalize()} ({nivel.capitalize()}) - Fallback Local",
-            "exercicios": exercicios_texto,
-        }
-        for i in range(min(frequencia, len(letras)))
-    ]
 
 
 def processar_resposta_ia(resposta):
