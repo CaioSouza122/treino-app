@@ -1,7 +1,6 @@
 import os
 import re
 import hashlib
-import asyncio
 import httpx
 from datetime import datetime, timedelta
 # pyrefly: ignore [missing-import]

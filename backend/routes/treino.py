@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 try:
     from sqlalchemy import select
@@ -9,7 +9,7 @@ from database.connection import get_db
 from schemas.treino_schema import TreinoRequest, WorkoutResponse
 from services.ia_service import gerar_treino_ia, testar_conexao_flask
 from models.user import User, Workout, WorkoutDay
-from typing import List, Optional
+from typing import List
 import uuid
 
 router = APIRouter()
@@ -92,7 +92,7 @@ async def gerar_treino(
         print(f"⚠️ Erro ao salvar treino no banco de dados: {db_err}")
         try:
             await db.rollback()
-        except:
+        except Exception:
             pass
 
     return resultado
