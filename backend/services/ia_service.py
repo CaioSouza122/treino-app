@@ -21,7 +21,7 @@ _cache_tempo = {}
 def gerar_treino_ia(dados):
     """
     Gera treino personalizado chamando a API no Render (que usa o Gemini internamente).
-    Faz fallback para None caso a API esteja inacessível.
+    Faz fallback local caso a API esteja inacessível.
     """
     try:
         chave = hashlib.md5(str(dados.__dict__).encode()).hexdigest()
@@ -37,12 +37,143 @@ def gerar_treino_ia(dados):
             _cache_tempo[chave] = datetime.now() + timedelta(hours=1)
             return resposta
 
-        print("⚠️ API externa não respondeu corretamente.")
-        return None
+        print("⚠️ API externa indisponível — usando fallback local.")
+        resposta = _gerar_treino_local(dados)
+        if resposta:
+            _cache[chave] = resposta
+            _cache_tempo[chave] = datetime.now() + timedelta(hours=1)
+        return resposta
 
     except Exception as e:
         print(f"❌ Erro geral: {e}")
-        return None
+        return _gerar_treino_local(dados)
+
+
+def _gerar_treino_local(dados) -> list:
+    """
+    Gera um treino estruturado localmente sem depender de API externa.
+    Usa templates baseados no objetivo, nível e frequência do usuário.
+    """
+    objetivo = (dados.objetivo or "hipertrofia").lower()
+    nivel = (dados.nivel or "intermediario").lower()
+    frequencia = dados.vezes_por_semana or 4
+    tempo = dados.tempo or 60
+
+    # Banco de exercícios por grupo muscular
+    exercicios_db = {
+        "peito": [
+            "Supino reto com barra — 4x8-12",
+            "Supino inclinado com halteres — 3x10-12",
+            "Crucifixo na polia — 3x12-15",
+            "Flexão de braço — 3x falha",
+        ],
+        "costas": [
+            "Barra fixa (ou puxada alta) — 4x6-10",
+            "Remada curvada com barra — 4x8-12",
+            "Remada unilateral com haltere — 3x10-12",
+            "Pulldown na polia — 3x12-15",
+        ],
+        "pernas": [
+            "Agachamento livre — 4x8-12",
+            "Leg press 45° — 3x10-15",
+            "Cadeira extensora — 3x12-15",
+            "Mesa flexora — 3x12-15",
+            "Panturrilha em pé — 4x15-20",
+        ],
+        "ombros": [
+            "Desenvolvimento com barra — 4x8-12",
+            "Elevação lateral com halteres — 4x12-15",
+            "Elevação frontal — 3x12",
+            "Encolhimento de ombros — 3x12-15",
+        ],
+        "biceps": [
+            "Rosca direta com barra — 3x10-12",
+            "Rosca alternada com halteres — 3x10-12",
+            "Rosca concentrada — 3x12-15",
+        ],
+        "triceps": [
+            "Tríceps testa com barra — 3x10-12",
+            "Tríceps pulley — 3x12-15",
+            "Mergulho entre bancos — 3x falha",
+        ],
+        "core": [
+            "Prancha frontal — 3x 45s",
+            "Abdominal supra — 3x20",
+            "Rotação russa — 3x20",
+            "Elevação de pernas — 3x15",
+        ],
+        "gluteos": [
+            "Hip thrust com barra — 4x10-12",
+            "Agachamento sumô — 3x12-15",
+            "Abdução de quadril na polia — 3x15",
+        ],
+    }
+
+    # Estrutura de divisões por frequência
+    divisoes = {
+        2: [
+            {"dia": "Treino A", "foco": "Corpo Todo (Empurrar)", "grupos": ["peito", "ombros", "triceps", "core"]},
+            {"dia": "Treino B", "foco": "Corpo Todo (Puxar + Pernas)", "grupos": ["costas", "biceps", "pernas", "gluteos"]},
+        ],
+        3: [
+            {"dia": "Treino A", "foco": "Peito e Tríceps", "grupos": ["peito", "triceps", "core"]},
+            {"dia": "Treino B", "foco": "Costas e Bíceps", "grupos": ["costas", "biceps"]},
+            {"dia": "Treino C", "foco": "Pernas e Glúteos", "grupos": ["pernas", "gluteos", "core"]},
+        ],
+        4: [
+            {"dia": "Treino A", "foco": "Peito e Tríceps", "grupos": ["peito", "triceps"]},
+            {"dia": "Treino B", "foco": "Costas e Bíceps", "grupos": ["costas", "biceps"]},
+            {"dia": "Treino C", "foco": "Pernas e Glúteos", "grupos": ["pernas", "gluteos"]},
+            {"dia": "Treino D", "foco": "Ombros e Core", "grupos": ["ombros", "core"]},
+        ],
+        5: [
+            {"dia": "Treino A", "foco": "Peito", "grupos": ["peito", "core"]},
+            {"dia": "Treino B", "foco": "Costas", "grupos": ["costas"]},
+            {"dia": "Treino C", "foco": "Pernas", "grupos": ["pernas"]},
+            {"dia": "Treino D", "foco": "Ombros e Bíceps", "grupos": ["ombros", "biceps"]},
+            {"dia": "Treino E", "foco": "Glúteos e Tríceps", "grupos": ["gluteos", "triceps", "core"]},
+        ],
+        6: [
+            {"dia": "Treino A", "foco": "Peito e Tríceps", "grupos": ["peito", "triceps"]},
+            {"dia": "Treino B", "foco": "Costas e Bíceps", "grupos": ["costas", "biceps"]},
+            {"dia": "Treino C", "foco": "Pernas", "grupos": ["pernas"]},
+            {"dia": "Treino D", "foco": "Ombros", "grupos": ["ombros", "core"]},
+            {"dia": "Treino E", "foco": "Peito e Bíceps", "grupos": ["peito", "biceps"]},
+            {"dia": "Treino F", "foco": "Costas e Glúteos", "grupos": ["costas", "gluteos"]},
+        ],
+    }
+
+    # Ajusta para a frequência mais próxima disponível
+    freq_valida = min(divisoes.keys(), key=lambda k: abs(k - frequencia))
+    template = divisoes[freq_valida][:frequencia]
+
+    obs_objetivo = {
+        "hipertrofia": "Foco em hipertrofia: descanso 60–90s entre séries, progressão de carga semanal.",
+        "emagrecimento": "Foco em emagrecimento: intervalos curtos 30–45s, circuitos quando possível.",
+        "forca": "Foco em força: descanso 2–3min entre séries, cargas elevadas com menos repetições.",
+        "resistencia": "Foco em resistência: repetições altas (15–20), intervalos curtos.",
+        "condicionamento": "Foco em condicionamento: combinar exercícios compostos e aeróbicos.",
+    }
+    obs = obs_objetivo.get(objetivo, f"Objetivo: {objetivo.capitalize()}. Progrida as cargas semanalmente.")
+
+    resultado = []
+    for bloco in template:
+        linhas = [f"🎯 {obs}", ""]
+        for grupo in bloco["grupos"]:
+            exercs = exercicios_db.get(grupo, [])
+            if exercs:
+                linhas.append(f"▸ {grupo.upper()}")
+                linhas.extend(f"  • {ex}" for ex in exercs)
+                linhas.append("")
+        linhas.append(f"⏱ Tempo estimado: {tempo} min")
+        resultado.append({
+            "dia": bloco["dia"],
+            "foco": bloco["foco"],
+            "exercicios": "\n".join(linhas).strip(),
+        })
+
+    print(f"✅ Treino local gerado com {len(resultado)} dias (fallback)")
+    return resultado
 
 
 def _chamar_api_externa_sync(dados):

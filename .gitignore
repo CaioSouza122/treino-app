@@ -1,4 +1,4 @@
-# Environments
+# ── Environments ───────────────────────────────────────────────────────────
 .env
 .venv
 env/
@@ -7,7 +7,7 @@ ENV/
 env.bak/
 venv.bak/
 
-# Python
+# ── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,8 +30,11 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
 
-# Node/React Native
+# ── Node / React Native / Expo ──────────────────────────────────────────────
 node_modules/
 .expo/
 dist/
@@ -39,22 +42,26 @@ web-build/
 *.jks
 *.mobileprovision
 .metro-health-check*
+pnpm-lock.yaml
+package-lock.json
 
-# OS Files
+# ── OS Files ────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Log files
+# ── Log files ───────────────────────────────────────────────────────────────
 *.log
+logs/
 
-# Generated Excel exports
+# ── Generated exports ────────────────────────────────────────────────────────
 *.xlsx
 
-# Databases
+# ── Databases ───────────────────────────────────────────────────────────────
 *.db
 *.sqlite
+*.sqlite3
 
-# IDEs and editors
+# ── IDEs and editors ────────────────────────────────────────────────────────
 .vscode/
 .idea/
 .project
@@ -66,3 +73,10 @@ Thumbs.db
 *.sln
 *.sw?
 
+# ── Docker ──────────────────────────────────────────────────────────────────
+.docker/
+
+# ── Temporários e lixo ──────────────────────────────────────────────────────
+zip_extracted/
+*.tmp
+*.bak
