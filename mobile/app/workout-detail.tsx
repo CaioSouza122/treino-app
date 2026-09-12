@@ -8,7 +8,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { ScreenHeader } from "@/components/screen-header";
 import { brand } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
-import { getLastWorkout, getWorkoutHistory, type LocalWorkout, type Workout, type WorkoutDay } from "@/lib/workouts-api";
+import { getLastWorkout, getWorkoutHistory, type Workout, type WorkoutDay } from "@/lib/workouts-api";
 
 type Exercise = { id: string; name: string; prescription: string; completed: boolean };
 type Session = { id: string; label: string; subtitle: string; duration: string; exercises: Exercise[] };

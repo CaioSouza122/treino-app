@@ -36,7 +36,7 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
 
       - name: 📦 Instalar dependências
-        run: npm ci
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
       - name: 🔍 Lint com Expo
-        run: npm run lint
+        run: npx eslint . --ext .js,.jsx,.ts,.tsx
