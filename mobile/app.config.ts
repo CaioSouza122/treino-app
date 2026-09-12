@@ -8,7 +8,6 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   scheme: "hipertrofia",
   userInterfaceStyle: "dark",
-  newArchEnabled: true,
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.app.hipertrofiaapp",
@@ -18,7 +17,6 @@ const config: ExpoConfig = {
       backgroundColor: "#08090D",
       foregroundImage: "./assets/images/android-icon-foreground.png",
     },
-    edgeToEdgeEnabled: true,
     package: "com.app.hipertrofiaapp",
   },
   web: {

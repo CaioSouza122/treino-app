@@ -36,5 +36,5 @@ jobs:
       - name: 📦 Instalar dependências
         run: npm install --legacy-peer-deps
 
-      - name: 🔍 Lint com Expo
-        run: npx eslint .
+      - name: 🔍 Checagem de Tipos (TypeScript)
+        run: npx tsc --noEmit
