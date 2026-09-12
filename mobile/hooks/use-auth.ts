@@ -105,7 +105,7 @@ export function useAuth(options?: UseAuthOptions) {
         fetchUser();
       } else {
         // Native: check for cached user info first for faster initial load
-        Auth.getUserInfo().then((cachedUser) => {
+        Auth.getUserInfo().then((cachedUser: any) => {
           console.log("[useAuth] Native cached user check:", cachedUser);
           if (cachedUser) {
             console.log("[useAuth] Native: setting cached user immediately");

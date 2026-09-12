@@ -16,8 +16,8 @@ type Session = { id: string; label: string; subtitle: string; duration: string; 
 const userId = process.env.EXPO_PUBLIC_TREINO_USER_ID || "mobile-demo-user";
 
 function parseExercises(day: WorkoutDay, dayIndex: number): Session {
-  const lines = day.exercicios.split("\n").map((line) => line.trim()).filter(Boolean);
-  const exercises = lines.filter((line) => !/^tempo estimado:/i.test(line)).map((line, index) => {
+  const lines = day.exercicios.split("\n").map((line: string) => line.trim()).filter(Boolean);
+  const exercises = lines.filter((line: string) => !/^tempo estimado:/i.test(line)).map((line: string, index: number) => {
     const clean = line.replace(/^[-*•\d.)]+\s*/, "");
     const match = clean.match(/^(.*?)\s*[-–—:]\s*(\d[^\n]*)$/);
     return {
@@ -50,7 +50,7 @@ export default function WorkoutDetailScreen() {
       try {
         const local = await getLastWorkout();
         const history = await getWorkoutHistory(userId).catch(() => []);
-        const selected = history.find((item) => item.id === params.workoutId) ?? history[0] ?? local;
+        const selected = history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
         if (!active) return;
         if (!selected) setError("Nenhum treino encontrado. Gere seu primeiro treino com a IA.");
         else {

@@ -39,7 +39,7 @@ export default function ProfileScreen() {
 
   function updateNumber(field: NumericField, value: string) {
     const numeric = Number(value.replace(",", "."));
-    setProfile((current) => ({
+    setProfile((current: UserProfile) => ({
       ...current,
       [field]: Number.isFinite(numeric) ? numeric : 0,
     }));
@@ -118,7 +118,7 @@ export default function ProfileScreen() {
               label="Nome"
               value={profile.name}
               onChangeText={(name) => {
-                setProfile((current) => ({ ...current, name }));
+                setProfile((current: UserProfile) => ({ ...current, name }));
                 setSaved(false);
               }}
             />
@@ -164,7 +164,7 @@ export default function ProfileScreen() {
                 label="Nível"
                 value={profile.nivel}
                 onChangeText={(nivel) => {
-                  setProfile((current) => ({ ...current, nivel }));
+                  setProfile((current: UserProfile) => ({ ...current, nivel }));
                   setSaved(false);
                 }}
               />
@@ -174,7 +174,7 @@ export default function ProfileScreen() {
               label="Objetivo"
               value={profile.objetivo}
               onChangeText={(objetivo) => {
-                setProfile((current) => ({ ...current, objetivo }));
+                setProfile((current: UserProfile) => ({ ...current, objetivo }));
                 setSaved(false);
               }}
             />
