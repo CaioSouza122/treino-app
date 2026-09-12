@@ -1,0 +1,42 @@
+name: 📱 Mobile CI
+
+on:
+  push:
+    branches: [main, develop, fature_1, "fature_*"]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "mobile/**"
+
+jobs:
+  lint:
+    name: Lint (Node.js ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ["20"]
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🟩 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: 📦 Instalar dependências
+        run: npm ci
+
+      - name: 🔍 Lint com Expo
+        run: npm run lint

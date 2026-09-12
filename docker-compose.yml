@@ -1,0 +1,49 @@
+# ── Treino.AI — docker-compose.yml ─────────────────────────────────────────
+# Orquestra o backend FastAPI + PostgreSQL local para desenvolvimento.
+# Uso: docker compose up --build
+#
+# ⚠️  Para produção use o banco Neon.tech configurado em backend/.env
+
+services:
+  # ── PostgreSQL Local ──────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: treinoai-db
+    environment:
+      POSTGRES_USER: treinoai
+      POSTGRES_PASSWORD: treinoai_dev
+      POSTGRES_DB: treinoai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U treinoai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend FastAPI ───────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: treinoai-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Banco de dados local (PostgreSQL do container acima)
+      DATABASE_URL: postgresql://treinoai:treinoai_dev@db:5432/treinoai
+      # URL da API de treinos externa (Render)
+      TREINO_API_URL: ${TREINO_API_URL:-https://api-treino-ygh4.onrender.com/api/v1}
+      TREINO_API_KEY: ${TREINO_API_KEY:-}
+    volumes:
+      # Hot-reload: sincroniza o código local com o container
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

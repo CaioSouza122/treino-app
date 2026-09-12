@@ -1,0 +1,21 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = ["E501"]
+exclude = ["venv", ".venv", "__pycache__"]
+
+[tool.ruff.isort]
+known-first-party = ["app", "routes", "services", "models", "schemas", "database"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+strict = false
