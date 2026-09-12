@@ -37,4 +37,4 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: 🔍 Lint com Expo
-        run: npx eslint . --ext .js,.jsx,.ts,.tsx
+        run: npx eslint .
