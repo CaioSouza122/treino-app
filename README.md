@@ -1,8 +1,11 @@
 <div align="center">
 
-# 🏋️‍♂️ Treino.AI
+# 🏋️‍♂️ HIPERTROF.IA
 
 **Seu personal trainer no bolso, movido a Inteligência Artificial.**
+
+[![Backend CI](https://github.com/CaioSouza122/treino-app/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/CaioSouza122/treino-app/actions/workflows/backend-ci.yml)
+[![Mobile CI](https://github.com/CaioSouza122/treino-app/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/CaioSouza122/treino-app/actions/workflows/mobile-ci.yml)
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -17,7 +20,7 @@
 
 ## 📖 Sobre o Projeto
 
-O **Treino.AI** é um aplicativo mobile **Full-Stack** que utiliza o **Google Gemini** para gerar protocolos de treino hiperpersonalizados. O usuário informa seus dados físicos (idade, peso, altura, objetivo, frequência semanal e tempo disponível) e a IA monta um plano de treino dividido (A, B, C...) adaptado à sua rotina.
+O **HIPERTROF.IA** é um aplicativo mobile **Full-Stack** que utiliza o **Google Gemini** para gerar protocolos de treino hiperpersonalizados. O usuário informa seus dados físicos (idade, peso, altura, objetivo, frequência semanal e tempo disponível) e a IA monta um plano de treino dividido (A, B, C...) adaptado à sua rotina.
 
 Quando a API de IA está indisponível, o sistema automaticamente usa um **fallback local** inteligente baseado em templates estruturados — garantindo que o usuário sempre receba um treino.
 
@@ -108,7 +111,7 @@ App Mobile → POST /gerar-treino-ia → Backend FastAPI
 
 ```bash
 # Clone o repositório
-git clone https://github.com/seu-usuario/treino-app.git
+git clone https://github.com/CaioSouza122/treino-app.git
 cd treino-app
 
 # Instala todas as dependências
@@ -117,7 +120,7 @@ make install
 # Terminal 1: inicia o backend
 make backend
 
-# Terminal 2: inicia o mobile
+# Terminal 2: inicia o mobile (dentro de mobile/)
 make mobile
 ```
 
