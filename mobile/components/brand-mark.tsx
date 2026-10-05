@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 240, 255, 0.12)",
     borderColor: "rgba(0, 240, 255, 0.35)",
     borderWidth: 1.5,
-    justify: "center",
+    justifyContent: "center",
     padding: 2,
   },
   markInner: {

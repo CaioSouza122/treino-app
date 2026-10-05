@@ -1,15 +1,15 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
-import { BrandMark } from "@/components/brand-mark";
 import { Entrance } from "@/components/entrance";
 import { PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
@@ -18,201 +18,400 @@ import { haptic } from "@/lib/haptics";
 import { getLastWorkout, type LocalWorkout } from "@/lib/workouts-api";
 import { getProfile, type UserProfile } from "@/lib/profile";
 
+const DAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const WEEK_LABELS = ["S", "T", "Q", "Q", "S", "S", "D"];
+
+function buildWeekData(workout: LocalWorkout | null) {
+  const today = new Date().getDay();
+  return WEEK_LABELS.map((label, i) => {
+    const trained = workout ? i % Math.max(1, 7 - workout.days.length) === 0 : false;
+    return { label, trained, isToday: i === today };
+  });
+}
+
 export default function HomeScreen() {
   const router = useRouter();
-  const [latest, setLatest] = useState<LocalWorkout | null>(null);
+  const [workout, setWorkout] = useState<LocalWorkout | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [note, setNote] = useState("");
+  const [notesSaved, setNotesSaved] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([getLastWorkout(), getProfile()])
-      .then(([workout, currentProfile]) => {
-        setLatest(workout);
-        setProfile(currentProfile);
-      })
-      .catch(() => {
-        setLatest(null);
-        setProfile(null);
-      });
+  const load = useCallback(async () => {
+    try {
+      const [w, p] = await Promise.all([getLastWorkout(), getProfile()]);
+      setWorkout(w);
+      setProfile(p);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
   const today = new Date()
-    .toLocaleDateString("pt-BR", {
-      weekday: "long",
-      day: "2-digit",
-      month: "short",
-    })
+    .toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "short" })
     .toUpperCase();
 
+  const todayIndex = new Date().getDay();
+  const todayDayName = DAYS_PT[todayIndex];
+  const todaySession =
+    workout?.days.find((d) => d.dia.toUpperCase().includes(todayDayName.toUpperCase())) ??
+    workout?.days[0];
+
+  const weekData = buildWeekData(workout);
+  const trainedCount = weekData.filter((d) => d.trained).length;
+
+  function saveNote() {
+    if (!note.trim()) return;
+    haptic.light();
+    setNotesSaved((prev) => [note.trim(), ...prev].slice(0, 5));
+    setNote("");
+  }
+
+  if (loading) {
+    return (
+      <ScreenContainer className="px-5">
+        <View style={styles.center}>
+          <MaterialIcons name="sync" size={26} color={brand.blueGlow} />
+          <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  // ── EMPTY STATE ──────────────────────────────────────────────────────────────
+  if (!workout) {
+    return (
+      <ScreenContainer className="px-5">
+        <ScrollView contentContainerStyle={styles.emptyContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.topbar}>
+            <View>
+              <Text style={styles.eyebrow}>{today}</Text>
+              <Text style={styles.greeting}>
+                Olá, <Text style={styles.accent}>{profile?.name || "Atleta"}</Text>
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => { haptic.light(); router.push("/profile" as never); }}
+              style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
+            >
+              <Text style={styles.avatarText}>{(profile?.name || "AT").slice(0, 2).toUpperCase()}</Text>
+            </Pressable>
+          </View>
+
+          <Entrance delay={80}>
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIconRing}>
+                <MaterialIcons name="fitness-center" size={36} color={brand.blueGlow} />
+              </View>
+              <Text style={styles.emptyTitle}>Nenhum plano montado</Text>
+              <Text style={styles.emptySubtitle}>
+                Crie seu primeiro treino personalizado com a IA e comece a evoluir hoje.
+              </Text>
+              <PrimaryButton
+                label="Criar Treino"
+                onPress={() => router.push("/(tabs)/chat" as never)}
+                variant="accent"
+                icon={<MaterialIcons name="auto-awesome" size={18} color={brand.blueGlow} />}
+                style={{ marginTop: 4 }}
+              />
+            </View>
+          </Entrance>
+
+          <Entrance delay={160}>
+            <View style={styles.chipRow}>
+              <InfoChip icon="psychology" label="IA Personalizada" />
+              <InfoChip icon="event-repeat" label="Divisão semanal" />
+              <InfoChip icon="insights" label="Progressão" />
+            </View>
+          </Entrance>
+        </ScrollView>
+      </ScreenContainer>
+    );
+  }
+
+  // ── WITH WORKOUT ─────────────────────────────────────────────────────────────
   return (
     <ScreenContainer className="px-5">
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── Topbar ─────────────────────────────────────────────────── */}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Topbar */}
         <View style={styles.topbar}>
           <View>
-            <View style={styles.dateBadge}>
-              <MaterialIcons name="calendar-today" color={brand.blueGlow} size={11} />
-              <Text style={styles.eyebrow}>{today}</Text>
-            </View>
+            <Text style={styles.eyebrow}>{today}</Text>
             <Text style={styles.greeting}>
               Olá, <Text style={styles.accent}>{profile?.name || "Atleta"}</Text>
             </Text>
           </View>
           <Pressable
-            accessibilityLabel="Abrir perfil"
-            onPress={() => {
-              haptic.light();
-              router.push("/profile" as never);
-            }}
+            onPress={() => { haptic.light(); router.push("/profile" as never); }}
             style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
           >
-            <Text style={styles.avatarText}>
-              {(profile?.name || "AT").slice(0, 2).toUpperCase()}
-            </Text>
+            <Text style={styles.avatarText}>{(profile?.name || "AT").slice(0, 2).toUpperCase()}</Text>
             <View style={styles.onlineDot} />
           </Pressable>
         </View>
 
-        {/* ── AI Engine Hero Card ─────────────────────────────────────── */}
+        {/* ── Treino de Hoje ─────────────────────────────────────────── */}
         <Entrance delay={60}>
-          <View style={styles.heroCard}>
-            <View style={styles.heroHeader}>
-              <BrandMark size={46} />
-              <View style={styles.liveChip}>
-                <View style={styles.pulseDot} />
-                <Text style={styles.liveChipText}>ENGINE IA ATIVA</Text>
-              </View>
-            </View>
-
-            <View style={styles.heroBody}>
-              <Text style={styles.heroTitle}>
-                Plano de Carga <Text style={styles.accent}>Inteligente</Text>
-              </Text>
-              <Text style={styles.heroSub}>
-                Algoritmo otimizado para progressão contínua de hipertrofia e volume muscular.
-              </Text>
-            </View>
-
-            <PrimaryButton
-              label="Gerar Novo Plano com IA"
-              onPress={() => router.push("/(tabs)/chat" as never)}
-              variant="accent"
-              icon={<MaterialIcons name="psychology" color={brand.blueGlow} size={20} />}
-              style={styles.heroButton}
-            />
-          </View>
-        </Entrance>
-
-        {/* ── Treino Atual ───────────────────────────────────────────── */}
-        <View style={styles.sectionHead}>
-          <View style={styles.sectionTitleWrap}>
-            <MaterialIcons name="fitness-center" color={brand.blueLight} size={18} />
-            <Text style={styles.sectionTitle}>Sessão Atual</Text>
-          </View>
-          <Pressable onPress={() => router.push("/workout-detail" as never)}>
-            <Text style={styles.textButton}>Ver detalhes</Text>
-          </Pressable>
-        </View>
-
-        <Entrance delay={120}>
+          <SectionLabel icon="today" label="Hoje" />
           <Pressable
             onPress={() => router.push("/workout-detail" as never)}
-            style={({ pressed }) => [styles.workoutCard, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.todayCard, pressed && styles.pressed]}
           >
-            <View style={styles.workoutIconBox}>
-              <MaterialIcons name="sports-gymnastics" color={brand.blueGlow} size={24} />
-            </View>
-            <View style={styles.workoutBody}>
-              <View style={styles.workoutLine}>
-                <Text style={styles.workoutTitle} numberOfLines={1}>
-                  {latest?.days[0]?.foco || "Nenhum plano gerado"}
+            <View style={styles.todayTop}>
+              <View style={styles.todayIconBox}>
+                <MaterialIcons name="sports-gymnastics" size={22} color={brand.blueGlow} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.todayLabel}>{todaySession?.foco || "Sessão do Dia"}</Text>
+                <Text style={styles.todayMeta}>
+                  {todaySession?.dia || "Treino A"} · {workout.days.length} dias/semana
                 </Text>
-                <View style={styles.statusTag}>
-                  <Text style={styles.statusTagText}>
-                    {latest ? "PRONTO" : "AGUARDANDO"}
-                  </Text>
-                </View>
               </View>
-              <Text style={styles.workoutMeta}>
-                {latest
-                  ? `${latest.days.length} dias/semana · ${latest.days[0]?.dia || "Treino A"}`
-                  : "Gere seu primeiro plano na aba Coach IA"}
-              </Text>
-              <View style={styles.progressTrack}>
-                <View
-                  style={[styles.progressFill, { width: latest ? "100%" : "0%" }]}
-                />
+              <View style={styles.readyTag}>
+                <Text style={styles.readyTagText}>PRONTO</Text>
               </View>
+              <MaterialIcons name="chevron-right" color={brand.dim} size={22} />
             </View>
-            <MaterialIcons name="chevron-right" color={brand.dim} size={24} />
+            <View style={styles.divider} />
+            <Text style={styles.exercisesPreview} numberOfLines={2}>
+              {todaySession?.exercicios
+                .split("\n")
+                .filter(Boolean)
+                .slice(0, 3)
+                .join("  ·  ") || "Ver exercícios completos"}
+            </Text>
           </Pressable>
         </Entrance>
 
-        {/* ── Atividade e Métricas ───────────────────────────────────── */}
-        <View style={styles.sectionHead}>
-          <View style={styles.sectionTitleWrap}>
-            <MaterialIcons name="insights" color={brand.neonLime} size={18} />
-            <Text style={styles.sectionTitle}>Métricas de Desempenho</Text>
-          </View>
-        </View>
-
-        <Entrance delay={180}>
-          <View style={styles.statsGrid}>
-            <StatBox icon="timer" value="45" label="min/sessão" color={brand.blueGlow} />
-            <StatBox icon="local-fire-department" value="2.8k" label="kcal estimadas" color={brand.neonLime} />
-            <StatBox icon="format-list-numbered" value="12" label="séries totais" color={brand.violet} />
+        {/* ── Divisão Semanal ───────────────────────────────────────── */}
+        <Entrance delay={120}>
+          <SectionLabel icon="event-repeat" label="Divisão Semanal" />
+          <View style={styles.weekPlanCard}>
+            {workout.days.map((day, i) => (
+              <Pressable
+                key={`${day.dia}-${i}`}
+                onPress={() =>
+                  router.push({
+                    pathname: "/workout-detail",
+                    params: { workoutId: workout.id },
+                  } as never)
+                }
+                style={({ pressed }) => [
+                  styles.dayRow,
+                  i < workout.days.length - 1 && styles.dayRowBorder,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={styles.dayBadge}>
+                  <Text style={styles.dayBadgeText}>{day.dia.slice(0, 3).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dayFoco}>{day.foco}</Text>
+                </View>
+                <MaterialIcons name="chevron-right" color={brand.dim} size={18} />
+              </Pressable>
+            ))}
           </View>
         </Entrance>
 
-        {/* ── Orientação do Treinador ──────────────────────────────── */}
-        <Entrance delay={220}>
-          <View style={styles.tipCard}>
-            <View style={styles.tipIconWrap}>
-              <MaterialIcons name="lightbulb" color={brand.blueGlow} size={20} />
-            </View>
-            <View style={styles.tipContent}>
-              <Text style={styles.tipTitle}>RECOMENDAÇÃO TÉCNICA</Text>
-              <Text style={styles.tipText}>
-                Descanso de 60 a 90 segundos garante maior ressíntese de ATP para cargas pesadas.
-              </Text>
+        {/* ── Gráfico de Evolução ────────────────────────────────────── */}
+        <Entrance delay={180}>
+          <View style={styles.sectionRow}>
+            <SectionLabel icon="bar-chart" label="Evolução — 7 dias" />
+            <View style={styles.streakChip}>
+              <MaterialIcons name="local-fire-department" size={13} color={brand.neonLime} />
+              <Text style={styles.streakText}>{trainedCount}x essa semana</Text>
             </View>
           </View>
+          <View style={styles.chartCard}>
+            <View style={styles.chartBars}>
+              {weekData.map((day, i) => (
+                <View key={i} style={styles.barCol}>
+                  <View style={styles.barTrack}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        {
+                          height: day.trained ? "100%" : "20%",
+                          backgroundColor: day.isToday
+                            ? brand.blueGlow
+                            : day.trained
+                            ? brand.blue
+                            : brand.border,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.barLabel, day.isToday && { color: brand.blueGlow }]}>
+                    {day.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.chartLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: brand.blueGlow }]} />
+                <Text style={styles.legendText}>Hoje</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: brand.blue }]} />
+                <Text style={styles.legendText}>Treinado</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: brand.border }]} />
+                <Text style={styles.legendText}>Descanso</Text>
+              </View>
+            </View>
+          </View>
+        </Entrance>
+
+        {/* ── Anotações ─────────────────────────────────────────────── */}
+        <Entrance delay={240}>
+          <SectionLabel icon="edit-note" label="Anotações" />
+          <View style={styles.notesCard}>
+            <View style={styles.noteInputRow}>
+              <TextInput
+                value={note}
+                onChangeText={setNote}
+                placeholder="Adicionar anotação do treino..."
+                placeholderTextColor={brand.dim}
+                style={styles.noteInput}
+                onSubmitEditing={saveNote}
+                returnKeyType="done"
+              />
+              <Pressable
+                onPress={saveNote}
+                style={({ pressed }) => [styles.noteAddBtn, pressed && styles.pressed]}
+              >
+                <MaterialIcons name="add" size={20} color={brand.text} />
+              </Pressable>
+            </View>
+            {notesSaved.length > 0 ? (
+              <View style={styles.noteList}>
+                {notesSaved.map((n, i) => (
+                  <View key={i} style={styles.noteItem}>
+                    <View style={styles.noteDot} />
+                    <Text style={styles.noteText}>{n}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noteEmpty}>
+                Nenhuma anotação ainda. Registre observações, PRs ou ajustes.
+              </Text>
+            )}
+          </View>
+        </Entrance>
+
+        {/* ── Quick Action ──────────────────────────────────────────── */}
+        <Entrance delay={300}>
+          <PrimaryButton
+            label="Atualizar Plano com IA"
+            onPress={() => router.push("/(tabs)/chat" as never)}
+            variant="primary"
+            icon={<MaterialIcons name="psychology" size={18} color={brand.text} />}
+          />
         </Entrance>
       </ScrollView>
     </ScreenContainer>
   );
 }
 
-function StatBox({
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function SectionLabel({
   icon,
-  value,
   label,
-  color,
 }: {
   icon: keyof typeof MaterialIcons.glyphMap;
-  value: string;
   label: string;
-  color: string;
 }) {
   return (
-    <View style={styles.statItem}>
-      <View style={[styles.statIconBadge, { backgroundColor: `${color}15`, borderColor: `${color}40` }]}>
-        <MaterialIcons name={icon} color={color} size={18} />
-      </View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={styles.sectionLabel}>
+      <MaterialIcons name={icon} size={16} color={brand.blueGlow} />
+      <Text style={styles.sectionLabelText}>{label}</Text>
     </View>
   );
 }
 
+function InfoChip({
+  icon,
+  label,
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  label: string;
+}) {
+  return (
+    <View style={styles.infoChip}>
+      <MaterialIcons name={icon} size={14} color={brand.blueGlow} />
+      <Text style={styles.infoChipText}>{label}</Text>
+    </View>
+  );
+}
+
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  content: { gap: 18, paddingBottom: 28, paddingTop: 12 },
-  topbar: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  dateBadge: { alignItems: "center", flexDirection: "row", gap: 5 },
-  eyebrow: { color: brand.muted, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
-  greeting: { color: brand.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.6, marginTop: 4 },
+  center: { alignItems: "center", flex: 1, gap: 10, justifyContent: "center" },
+  loadingText: { color: brand.muted, fontSize: 13 },
+
+  // Empty state
+  emptyContent: { gap: 20, paddingBottom: 40, paddingTop: 12 },
+  emptyCard: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.borderHighlight,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 10,
+    padding: 32,
+  },
+  emptyIconRing: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,240,255,0.08)",
+    borderColor: "rgba(0,240,255,0.3)",
+    borderRadius: 36,
+    borderWidth: 1,
+    height: 72,
+    justifyContent: "center",
+    marginBottom: 4,
+    width: 72,
+  },
+  emptyTitle: {
+    color: brand.text,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+    textAlign: "center",
+  },
+  emptySubtitle: { color: brand.muted, fontSize: 13, lineHeight: 19, textAlign: "center" },
+  chipRow: { flexDirection: "row", gap: 8, justifyContent: "center" },
+  infoChip: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  infoChipText: { color: brand.muted, fontSize: 11, fontWeight: "700" },
+
+  // Main content
+  content: { gap: 14, paddingBottom: 32, paddingTop: 12 },
+
+  // Topbar
+  topbar: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  eyebrow: { color: brand.muted, fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
+  greeting: { color: brand.text, fontSize: 24, fontWeight: "900", letterSpacing: -0.5, marginTop: 3 },
   accent: { color: brand.blueGlow },
   avatar: {
     alignItems: "center",
@@ -235,131 +434,146 @@ const styles = StyleSheet.create({
     right: 0,
     width: 10,
   },
-  heroCard: {
+
+  // Section label
+  sectionLabel: { alignItems: "center", flexDirection: "row", gap: 7, marginBottom: 8, marginTop: 2 },
+  sectionLabelText: { color: brand.text, fontSize: 14, fontWeight: "900", letterSpacing: 0.1 },
+  sectionRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+
+  // Today card
+  todayCard: {
     backgroundColor: brand.surfaceCard,
     borderColor: brand.borderHighlight,
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 20,
-  },
-  heroHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justify: "space-between",
-  },
-  liveChip: {
-    alignItems: "center",
-    backgroundColor: "rgba(0, 240, 255, 0.08)",
-    borderColor: "rgba(0, 240, 255, 0.3)",
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  pulseDot: {
-    backgroundColor: brand.blueGlow,
-    borderRadius: 4,
-    height: 6,
-    width: 6,
-  },
-  liveChipText: {
-    color: brand.blueGlow,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-  heroBody: { marginVertical: 14 },
-  heroTitle: { color: brand.text, fontSize: 22, fontWeight: "900", letterSpacing: -0.5, lineHeight: 28 },
-  heroSub: { color: brand.muted, fontSize: 13, lineHeight: 19, marginTop: 6 },
-  heroButton: { marginTop: 4 },
-  sectionHead: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
-  },
-  sectionTitleWrap: { alignItems: "center", flexDirection: "row", gap: 8 },
-  sectionTitle: { color: brand.text, fontSize: 17, fontWeight: "900", letterSpacing: -0.3 },
-  textButton: { color: brand.blueGlow, fontSize: 12, fontWeight: "800" },
-  workoutCard: {
-    alignItems: "center",
-    backgroundColor: brand.surfaceCard,
-    borderColor: brand.border,
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 14,
     padding: 16,
   },
-  workoutIconBox: {
+  todayTop: { alignItems: "center", flexDirection: "row", gap: 12 },
+  todayIconBox: {
     alignItems: "center",
-    backgroundColor: "rgba(0, 240, 255, 0.08)",
-    borderColor: "rgba(0, 240, 255, 0.2)",
-    borderRadius: 16,
+    backgroundColor: "rgba(0,240,255,0.08)",
+    borderColor: "rgba(0,240,255,0.25)",
+    borderRadius: 14,
     borderWidth: 1,
-    height: 48,
+    height: 46,
     justifyContent: "center",
-    width: 48,
+    width: 46,
   },
-  workoutBody: { flex: 1 },
-  workoutLine: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  workoutTitle: { color: brand.text, flex: 1, fontSize: 16, fontWeight: "800" },
-  statusTag: {
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
+  todayLabel: { color: brand.text, fontSize: 16, fontWeight: "900", letterSpacing: -0.2 },
+  todayMeta: { color: brand.muted, fontSize: 12, marginTop: 2 },
+  readyTag: {
+    backgroundColor: "rgba(16,185,129,0.12)",
     borderColor: brand.success,
     borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  statusTagText: { color: brand.success, fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
-  workoutMeta: { color: brand.muted, fontSize: 12, marginTop: 3 },
-  progressTrack: { backgroundColor: brand.border, borderRadius: 10, height: 4, marginTop: 10, overflow: "hidden" },
-  progressFill: { backgroundColor: brand.blueGlow, borderRadius: 10, height: "100%" },
-  statsGrid: { flexDirection: "row", gap: 10 },
-  statItem: {
-    alignItems: "center",
+  readyTagText: { color: brand.success, fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
+  divider: { backgroundColor: brand.border, height: 1, marginVertical: 12 },
+  exercisesPreview: { color: brand.muted, fontSize: 12, lineHeight: 17 },
+
+  // Week plan
+  weekPlanCard: {
     backgroundColor: brand.surfaceCard,
     borderColor: brand.border,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    flex: 1,
-    paddingVertical: 14,
+    overflow: "hidden",
   },
-  statIconBadge: {
+  dayRow: { alignItems: "center", flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingVertical: 13 },
+  dayRowBorder: { borderBottomColor: brand.border, borderBottomWidth: 1 },
+  dayBadge: {
     alignItems: "center",
-    borderRadius: 12,
+    backgroundColor: "rgba(0,240,255,0.08)",
+    borderColor: "rgba(0,240,255,0.25)",
+    borderRadius: 8,
     borderWidth: 1,
     height: 34,
     justifyContent: "center",
-    marginBottom: 8,
-    width: 34,
+    width: 44,
   },
-  statValue: { color: brand.text, fontSize: 17, fontWeight: "900" },
-  statLabel: { color: brand.muted, fontSize: 10, marginTop: 2 },
-  tipCard: {
-    alignItems: "center",
-    backgroundColor: "rgba(19, 35, 66, 0.5)",
-    borderColor: brand.borderHighlight,
-    borderRadius: 18,
+  dayBadgeText: { color: brand.blueGlow, fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
+  dayFoco: { color: brand.text, fontSize: 13, fontWeight: "700" },
+
+  // Chart
+  chartCard: {
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 20,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
     padding: 16,
   },
-  tipIconWrap: {
-    alignItems: "center",
-    backgroundColor: "rgba(0, 240, 255, 0.1)",
-    borderRadius: 12,
-    height: 38,
-    justifyContent: "center",
-    width: 38,
+  chartBars: { alignItems: "flex-end", flexDirection: "row", gap: 8, height: 80 },
+  barCol: { alignItems: "center", flex: 1 },
+  barTrack: {
+    backgroundColor: brand.border,
+    borderRadius: 6,
+    flex: 1,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+    width: "100%",
   },
-  tipContent: { flex: 1 },
-  tipTitle: { color: brand.blueGlow, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
-  tipText: { color: brand.muted, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  barFill: { borderRadius: 6, width: "100%" },
+  barLabel: { color: brand.dim, fontSize: 10, fontWeight: "700", marginTop: 5 },
+  chartLegend: {
+    borderTopColor: brand.border,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 14,
+    justifyContent: "center",
+    marginTop: 12,
+    paddingTop: 10,
+  },
+  legendItem: { alignItems: "center", flexDirection: "row", gap: 5 },
+  legendDot: { borderRadius: 4, height: 8, width: 8 },
+  legendText: { color: brand.muted, fontSize: 10 },
+  streakChip: {
+    alignItems: "center",
+    backgroundColor: "rgba(163,230,53,0.08)",
+    borderColor: "rgba(163,230,53,0.3)",
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  streakText: { color: brand.neonLime, fontSize: 10, fontWeight: "800" },
+
+  // Notes
+  notesCard: {
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+  },
+  noteInputRow: { alignItems: "center", flexDirection: "row", gap: 8 },
+  noteInput: {
+    backgroundColor: brand.background,
+    borderColor: brand.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: brand.text,
+    flex: 1,
+    fontSize: 13,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  noteAddBtn: {
+    alignItems: "center",
+    backgroundColor: brand.blue,
+    borderRadius: 12,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  noteList: { gap: 8, marginTop: 12 },
+  noteItem: { alignItems: "flex-start", flexDirection: "row", gap: 8 },
+  noteDot: { backgroundColor: brand.blueGlow, borderRadius: 4, height: 6, marginTop: 5, width: 6 },
+  noteText: { color: brand.muted, flex: 1, fontSize: 13, lineHeight: 18 },
+  noteEmpty: { color: brand.dim, fontSize: 12, marginTop: 10, textAlign: "center" },
+
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
 });
-

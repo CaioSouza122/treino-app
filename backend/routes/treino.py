@@ -89,7 +89,7 @@ async def gerar_treino(
         
         await db.commit()
     except Exception as db_err:
-        print(f"⚠️ Erro ao salvar treino no banco de dados: {db_err}")
+        print(f"[WARN] Erro ao salvar treino no banco de dados: {db_err}")
         try:
             await db.rollback()
         except Exception:
