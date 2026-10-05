@@ -40,54 +40,79 @@ export default function PlansScreen() {
         {/* ── Header ─────────────────────────────────────────────────── */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.eyebrow}>BIBLIOTECA</Text>
-            <Text style={styles.title}>Meus treinos</Text>
+            <View style={styles.eyebrowBadge}>
+              <MaterialIcons name="folder-special" size={12} color={brand.blueGlow} />
+              <Text style={styles.eyebrow}>BIBLIOTECA ATLETA</Text>
+            </View>
+            <Text style={styles.title}>Meus Treinos</Text>
           </View>
-          <BrandMark size={40} />
+          <BrandMark size={42} />
         </View>
 
         {/* ── Estado vazio / carregando ──────────────────────────────── */}
-        {loading && <Text style={styles.feedback}>Carregando histórico...</Text>}
-        {!loading && !current && (
-          <Text style={styles.feedback}>
-            Você ainda não tem treinos. Gere seu primeiro plano com a IA.
-          </Text>
+        {loading && (
+          <View style={styles.feedbackBox}>
+            <MaterialIcons name="sync" size={24} color={brand.blueGlow} />
+            <Text style={styles.feedbackText}>Sincronizando biblioteca de treinos...</Text>
+          </View>
         )}
 
-        {/* ── Treino atual (destaque) ────────────────────────────────── */}
+        {!loading && !current && (
+          <View style={styles.feedbackBox}>
+            <MaterialIcons name="post-add" size={28} color={brand.dim} />
+            <Text style={styles.feedbackText}>
+              Nenhum plano cadastrado. Inicie o Coach IA para gerar seu treino.
+            </Text>
+          </View>
+        )}
+
+        {/* ── Treino ativo (destaque) ────────────────────────────────── */}
         {current && (
           <Pressable
             onPress={() =>
               router.push({ pathname: "/workout-detail", params: { workoutId: current.id } })
             }
-            style={({ pressed }) => [styles.current, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.currentCard, pressed && styles.pressed]}
           >
-            <View style={styles.currentTop}>
-              <View style={styles.blueSquare}>
-                <MaterialIcons name="fitness-center" size={25} color={brand.text} />
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.iconBox}>
+                <MaterialIcons name="fitness-center" size={22} color={brand.blueGlow} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.currentTitle}>
-                  {current.days[0]?.foco || "Treino personalizado"}
+                <Text style={styles.currentTitle} numberOfLines={1}>
+                  {current.days[0]?.foco || "Plano Personalizado"}
                 </Text>
                 <Text style={styles.currentSub}>
-                  {current.days.length} dias por semana · Gerado pela IA
+                  {current.days.length} sessões semanais · Otimizado por IA
                 </Text>
               </View>
-              <Text style={styles.active}>RECENTE</Text>
+              <View style={styles.activeTag}>
+                <Text style={styles.activeTagText}>ATIVO</Text>
+              </View>
             </View>
-            <Text style={styles.currentProgress}>
-              {new Date(current.created_at).toLocaleDateString("pt-BR")} ·{" "}
-              {current.days.length} sessões
-            </Text>
+
+            <View style={styles.cardDivider} />
+
+            <View style={styles.cardFooter}>
+              <View style={styles.footerItem}>
+                <MaterialIcons name="event" size={14} color={brand.muted} />
+                <Text style={styles.footerText}>
+                  {new Date(current.created_at).toLocaleDateString("pt-BR")}
+                </Text>
+              </View>
+              <View style={styles.footerItem}>
+                <MaterialIcons name="view-carousel" size={14} color={brand.muted} />
+                <Text style={styles.footerText}>{current.days.length} Dias</Text>
+              </View>
+            </View>
           </Pressable>
         )}
 
-        {/* ── Cabeçalho do histórico ─────────────────────────────────── */}
+        {/* ── Histórico Section ─────────────────────────────────────── */}
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Histórico</Text>
-          <Text style={styles.count}>
-            {workouts.length} {workouts.length === 1 ? "treino" : "treinos"}
+          <Text style={styles.sectionTitle}>Histórico de Planos</Text>
+          <Text style={styles.countText}>
+            {workouts.length} {workouts.length === 1 ? "registro" : "registros"}
           </Text>
         </View>
 
@@ -98,29 +123,30 @@ export default function PlansScreen() {
             onPress={() =>
               router.push({ pathname: "/workout-detail", params: { workoutId: workout.id } })
             }
-            style={({ pressed }) => [styles.mini, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.historyItem, pressed && styles.pressed]}
           >
-            <View style={styles.miniIcon}>
-              <MaterialIcons name="history" size={22} color={brand.blueLight} />
+            <View style={styles.historyIcon}>
+              <MaterialIcons name="history" size={20} color={brand.muted} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.miniTitle}>
-                {workout.days[0]?.foco || "Treino personalizado"}
+              <Text style={styles.historyTitle}>
+                {workout.days[0]?.foco || "Plano Personalizado"}
               </Text>
-              <Text style={styles.miniSub}>
+              <Text style={styles.historySub}>
                 {new Date(workout.created_at).toLocaleDateString("pt-BR")} ·{" "}
                 {workout.days.length} sessões
               </Text>
             </View>
-            <MaterialIcons name="chevron-right" color={brand.muted} size={22} />
+            <MaterialIcons name="chevron-right" color={brand.dim} size={22} />
           </Pressable>
         ))}
 
-        {/* ── CTA ────────────────────────────────────────────────────── */}
+        {/* ── CTA Botão ──────────────────────────────────────────────── */}
         <PrimaryButton
-          label="Montar novo treino com IA"
+          label="Montar Novo Treino com IA"
           onPress={() => router.push("/(tabs)/chat" as never)}
-          icon={<MaterialIcons name="auto-awesome" size={18} color={brand.text} />}
+          variant="accent"
+          icon={<MaterialIcons name="psychology" size={20} color={brand.blueGlow} />}
           style={{ marginTop: 8 }}
         />
       </ScrollView>
@@ -130,23 +156,77 @@ export default function PlansScreen() {
 
 const styles = StyleSheet.create({
   content: { gap: 16, paddingBottom: 28, paddingTop: 14 },
-  header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 5 },
-  eyebrow: { color: brand.blueLight, fontSize: 11, fontWeight: "900", letterSpacing: 0.7 },
-  title: { color: brand.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.7, marginTop: 3 },
-  feedback: { color: brand.muted, fontSize: 14, lineHeight: 20, paddingVertical: 24 },
-  current: { backgroundColor: brand.surface, borderColor: brand.blue, borderRadius: 22, borderWidth: 1, padding: 17 },
-  currentTop: { alignItems: "center", flexDirection: "row", gap: 12 },
-  blueSquare: { alignItems: "center", backgroundColor: brand.blue, borderRadius: 15, height: 47, justifyContent: "center", width: 47 },
-  currentTitle: { color: brand.text, flex: 1, fontSize: 18, fontWeight: "900" },
-  currentSub: { color: brand.muted, fontSize: 12, marginTop: 4 },
-  active: { color: brand.blueLight, fontSize: 10, fontWeight: "900", letterSpacing: 0.4 },
-  currentProgress: { color: brand.muted, fontSize: 12, marginTop: 16 },
+  header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  eyebrowBadge: { alignItems: "center", flexDirection: "row", gap: 5 },
+  eyebrow: { color: brand.blueGlow, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
+  title: { color: brand.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.6, marginTop: 4 },
+  feedbackBox: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 10,
+    justifyContent: "center",
+    paddingVertical: 32,
+  },
+  feedbackText: { color: brand.muted, fontSize: 13, textAlign: "center" },
+  currentCard: {
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.borderHighlight,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 18,
+  },
+  cardHeaderRow: { alignItems: "center", flexDirection: "row", gap: 12 },
+  iconBox: {
+    alignItems: "center",
+    backgroundColor: "rgba(0, 240, 255, 0.1)",
+    borderColor: "rgba(0, 240, 255, 0.3)",
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  currentTitle: { color: brand.text, fontSize: 17, fontWeight: "900" },
+  currentSub: { color: brand.muted, fontSize: 12, marginTop: 3 },
+  activeTag: {
+    backgroundColor: "rgba(0, 240, 255, 0.12)",
+    borderColor: brand.blueGlow,
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  activeTagText: { color: brand.blueGlow, fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  cardDivider: { backgroundColor: brand.border, height: 1, marginVertical: 14 },
+  cardFooter: { flexDirection: "row", gap: 16 },
+  footerItem: { alignItems: "center", flexDirection: "row", gap: 6 },
+  footerText: { color: brand.muted, fontSize: 12, fontWeight: "600" },
   sectionHead: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
-  sectionTitle: { color: brand.text, fontSize: 18, fontWeight: "900" },
-  count: { color: brand.muted, fontSize: 12 },
-  mini: { alignItems: "center", backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 18, borderWidth: 1, flexDirection: "row", gap: 12, padding: 14 },
-  miniIcon: { alignItems: "center", backgroundColor: brand.blueSoft, borderRadius: 13, height: 42, justifyContent: "center", width: 42 },
-  miniTitle: { color: brand.text, flex: 1, fontSize: 15, fontWeight: "800" },
-  miniSub: { color: brand.muted, fontSize: 12, marginTop: 3 },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  sectionTitle: { color: brand.text, fontSize: 17, fontWeight: "900" },
+  countText: { color: brand.dim, fontSize: 12, fontWeight: "700" },
+  historyItem: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  historyIcon: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceElevated,
+    borderRadius: 12,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  historyTitle: { color: brand.text, fontSize: 14, fontWeight: "800" },
+  historySub: { color: brand.muted, fontSize: 11, marginTop: 2 },
+  pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
 });
+

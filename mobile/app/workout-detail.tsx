@@ -17,23 +17,25 @@ const userId = process.env.EXPO_PUBLIC_TREINO_USER_ID || "mobile-demo-user";
 
 function parseExercises(day: WorkoutDay, dayIndex: number): Session {
   const lines = day.exercicios.split("\n").map((line: string) => line.trim()).filter(Boolean);
-  const exercises = lines.filter((line: string) => !/^tempo estimado:/i.test(line)).map((line: string, index: number) => {
-    const clean = line.replace(/^[-*•\d.)]+\s*/, "");
-    const match = clean.match(/^(.*?)\s*[-–—:]\s*(\d[^\n]*)$/);
-    return {
-      id: `${day.dia}-${index}`,
-      name: match?.[1]?.trim() || clean,
-      prescription: match?.[2]?.trim() || "Conforme orientação",
-      completed: false,
-    };
-  });
+  const exercises = lines
+    .filter((line: string) => !/^tempo estimado:/i.test(line))
+    .map((line: string, index: number) => {
+      const clean = line.replace(/^[-*•\d.)]+\s*/, "");
+      const match = clean.match(/^(.*?)\s*[-–—:]\s*(\d[^\n]*)$/);
+      return {
+        id: `${day.dia}-${index}`,
+        name: match?.[1]?.trim() || clean,
+        prescription: match?.[2]?.trim() || "3x10 a 12 repetições",
+        completed: false,
+      };
+    });
 
   return {
     id: `${day.dia}-${dayIndex}`,
     label: day.dia || `Treino ${String.fromCharCode(65 + dayIndex)}`,
-    subtitle: day.foco || "Treino personalizado",
-    duration: day.exercicios.match(/Tempo estimado:\s*(\d+)/i)?.[1] ? `${day.exercicios.match(/Tempo estimado:\s*(\d+)/i)?.[1]} min` : "—",
-    exercises: exercises.length ? exercises : [{ id: `${day.dia}-empty`, name: "Consulte a descrição do treino", prescription: "—", completed: false }],
+    subtitle: day.foco || "Sessão de Hipertrofia",
+    duration: day.exercicios.match(/Tempo estimado:\s*(\d+)/i)?.[1] ? `${day.exercicios.match(/Tempo estimado:\s*(\d+)/i)?.[1]} min` : "50 min",
+    exercises: exercises.length ? exercises : [{ id: `${day.dia}-empty`, name: "Consulte o protocolo de treino", prescription: "3x12", completed: false }],
   };
 }
 
@@ -75,23 +77,229 @@ export default function WorkoutDetailScreen() {
 
   function toggle(id: string) {
     haptic.medium();
-    setSessions((current) => current.map((session) => ({ ...session, exercises: session.exercises.map((exercise) => exercise.id === id ? { ...exercise, completed: !exercise.completed } : exercise) })));
+    setSessions((current) =>
+      current.map((session) => ({
+        ...session,
+        exercises: session.exercises.map((exercise) =>
+          exercise.id === id ? { ...exercise, completed: !exercise.completed } : exercise
+        ),
+      }))
+    );
   }
 
-  if (loading) return <ScreenContainer className="px-5"><View style={styles.center}><Text style={styles.message}>Carregando seu treino...</Text></View></ScreenContainer>;
-  if (error || !workout) return <ScreenContainer className="px-5"><View style={styles.center}><Text style={styles.message}>{error ?? "Treino não encontrado."}</Text></View></ScreenContainer>;
+  if (loading) {
+    return (
+      <ScreenContainer className="px-5">
+        <View style={styles.center}>
+          <MaterialIcons name="sync" size={32} color={brand.blueGlow} />
+          <Text style={styles.message}>Carregando protocolo de treino...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
-  return <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5"><View style={styles.fill}>
-    <ScreenHeader title={sessions[0]?.subtitle || "Treino personalizado"} subtitle={`Gerado pela IA · ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`} right={<Pressable style={styles.menu}><MaterialIcons name="more-horiz" color={brand.text} size={26} /></Pressable>} />
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.metrics}><Metric icon="calendar-month" value={String(sessions.length)} label="dias" /><Metric icon="timer" value={sessions[0]?.duration.replace(" min", "") || "—"} label="min/sessão" /><Metric icon="fitness-center" value={String(sessions.reduce((sum, session) => sum + session.exercises.length, 0))} label="exercícios" /><Metric icon="bar-chart" value="IA" label="nível" /></View>
-      {sessions.map((session, index) => <SessionCard key={session.id} session={session} expanded={index === 0} onToggle={toggle} />)}
-    </ScrollView>
-    <PrimaryButton label={progress.done === progress.total ? "Treino concluído" : "Começar treino"} onPress={() => {}} icon={<MaterialIcons name={progress.done === progress.total ? "check-circle" : "play-arrow"} color={brand.text} size={21} />} style={styles.start} />
-  </View></ScreenContainer>;
+  if (error || !workout) {
+    return (
+      <ScreenContainer className="px-5">
+        <View style={styles.center}>
+          <MaterialIcons name="warning" size={32} color={brand.danger} />
+          <Text style={styles.message}>{error ?? "Treino não encontrado."}</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  return (
+    <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5">
+      <View style={styles.fill}>
+        <ScreenHeader
+          title={sessions[0]?.subtitle || "Plano Hipertrofia"}
+          subtitle={`OTIMIZADO POR IA · ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`}
+          right={
+            <Pressable style={styles.menuBtn}>
+              <MaterialIcons name="more-vert" color={brand.text} size={22} />
+            </Pressable>
+          }
+        />
+
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Métricas do treino */}
+          <View style={styles.metricsRow}>
+            <MetricBox icon="event-repeat" value={String(sessions.length)} label="dias/sem" color={brand.blueGlow} />
+            <MetricBox icon="timer" value={sessions[0]?.duration.replace(" min", "") || "50"} label="min/sessão" color={brand.neonLime} />
+            <MetricBox icon="fitness-center" value={String(sessions.reduce((sum, session) => sum + session.exercises.length, 0))} label="exercícios" color={brand.violet} />
+            <MetricBox icon="insights" value="ALTA" label="intensidade" color={brand.success} />
+          </View>
+
+          {/* Progresso Geral */}
+          <View style={styles.overallProgressCard}>
+            <View style={styles.overallHeader}>
+              <Text style={styles.overallTitle}>PROGRESSO DA SESSÃO</Text>
+              <Text style={styles.overallRatio}>{progress.done} de {progress.total} concluídos</Text>
+            </View>
+            <View style={styles.trackBar}>
+              <View style={[styles.fillBar, { width: `${progress.ratio * 100}%` }]} />
+            </View>
+          </View>
+
+          {/* Listagem de Sessões */}
+          {sessions.map((session, index) => (
+            <SessionCard key={session.id} session={session} defaultExpanded={index === 0} onToggle={toggle} />
+          ))}
+        </ScrollView>
+
+        <PrimaryButton
+          label={progress.done === progress.total ? "Concluir Sessão de Treino" : "Iniciar Treino Atual"}
+          onPress={() => haptic.success()}
+          variant={progress.done === progress.total ? "primary" : "accent"}
+          icon={<MaterialIcons name={progress.done === progress.total ? "check-circle" : "play-arrow"} color={brand.text} size={20} />}
+          style={styles.startBtn}
+        />
+      </View>
+    </ScreenContainer>
+  );
 }
 
-function Metric({ icon, value, label }: { icon: keyof typeof MaterialIcons.glyphMap; value: string; label: string }) { return <View style={styles.metric}><MaterialIcons name={icon} color={brand.blueLight} size={20} /><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>; }
-function SessionCard({ session, expanded, onToggle }: { session: Session; expanded: boolean; onToggle: (id: string) => void }) { const done = session.exercises.filter((exercise) => exercise.completed).length; const ratio = session.exercises.length ? done / session.exercises.length : 0; return <View style={styles.session}><View style={styles.sessionHead}><View><Text style={styles.sessionTitle}>{session.label} — {session.subtitle}</Text><Text style={styles.sessionSub}>{done}/{session.exercises.length} exercícios · {session.duration}</Text></View><MaterialIcons name={expanded ? "expand-less" : "expand-more"} color={brand.muted} size={25} /></View><View style={styles.track}><View style={[styles.fillTrack, { width: `${ratio * 100}%` }]} /></View>{expanded && <View style={styles.exerciseList}>{session.exercises.map((exercise, index) => <Pressable key={exercise.id} onPress={() => onToggle(exercise.id)} style={({ pressed }) => [styles.exercise, pressed && styles.pressed]}><View style={[styles.number, exercise.completed && styles.numberComplete]}>{exercise.completed ? <MaterialIcons name="check" color={brand.text} size={15} /> : <Text style={styles.numberText}>{index + 1}</Text>}</View><Text style={[styles.exerciseName, exercise.completed && styles.completeText]}>{exercise.name}</Text><Text style={styles.prescription}>{exercise.prescription}</Text><MaterialIcons name={exercise.completed ? "check-circle" : "radio-button-unchecked"} color={exercise.completed ? brand.success : brand.muted} size={21} /></Pressable>)}</View>}</View>; }
+function MetricBox({ icon, value, label, color }: { icon: keyof typeof MaterialIcons.glyphMap; value: string; label: string; color: string }) {
+  return (
+    <View style={styles.metricCard}>
+      <MaterialIcons name={icon} color={color} size={18} />
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
 
-const styles = StyleSheet.create({ fill: { flex: 1 }, center: { alignItems: "center", flex: 1, justifyContent: "center", padding: 24 }, message: { color: brand.muted, fontSize: 15, textAlign: "center" }, menu: { alignItems: "center", height: 42, justifyContent: "center", width: 42 }, content: { gap: 16, paddingBottom: 26, paddingTop: 12 }, metrics: { flexDirection: "row", gap: 7 }, metric: { alignItems: "center", backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 14, borderWidth: 1, flex: 1, gap: 3, paddingVertical: 10 }, metricValue: { color: brand.text, fontSize: 16, fontWeight: "900" }, metricLabel: { color: brand.muted, fontSize: 10 }, session: { backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 20, borderWidth: 1, overflow: "hidden", padding: 15 }, sessionHead: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, sessionTitle: { color: brand.text, flex: 1, fontSize: 16, fontWeight: "900" }, sessionSub: { color: brand.muted, fontSize: 12, marginTop: 4 }, track: { backgroundColor: brand.border, borderRadius: 7, height: 5, marginTop: 13, overflow: "hidden" }, fillTrack: { backgroundColor: brand.blue, borderRadius: 7, height: "100%" }, exerciseList: { gap: 8, marginTop: 14 }, exercise: { alignItems: "center", backgroundColor: "#0C0F15", borderColor: brand.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, minHeight: 55, paddingHorizontal: 10 }, number: { alignItems: "center", borderColor: brand.blue, borderRadius: 12, borderWidth: 1, height: 24, justifyContent: "center", width: 24 }, numberComplete: { backgroundColor: brand.success, borderColor: brand.success }, numberText: { color: brand.blueLight, fontSize: 12, fontWeight: "900" }, exerciseName: { color: brand.text, flex: 1, fontSize: 13, fontWeight: "700" }, completeText: { color: brand.muted, textDecorationLine: "line-through" }, prescription: { color: brand.blueLight, fontSize: 12, fontWeight: "800" }, start: { marginBottom: 4 }, pressed: { opacity: 0.74, transform: [{ scale: 0.98 }] } });
+function SessionCard({ session, defaultExpanded, onToggle }: { session: Session; defaultExpanded: boolean; onToggle: (id: string) => void }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const done = session.exercises.filter((ex) => ex.completed).length;
+  const ratio = session.exercises.length ? done / session.exercises.length : 0;
+
+  return (
+    <View style={styles.sessionCard}>
+      <Pressable onPress={() => setExpanded(!expanded)} style={styles.sessionHead}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sessionTitle}>{session.label} — {session.subtitle}</Text>
+          <Text style={styles.sessionSub}>{done} de {session.exercises.length} exercícios · {session.duration}</Text>
+        </View>
+        <MaterialIcons name={expanded ? "expand-less" : "expand-more"} color={brand.muted} size={24} />
+      </Pressable>
+
+      <View style={styles.sessionTrack}>
+        <View style={[styles.sessionTrackFill, { width: `${ratio * 100}%` }]} />
+      </View>
+
+      {expanded && (
+        <View style={styles.exerciseList}>
+          {session.exercises.map((exercise, index) => (
+            <Pressable
+              key={exercise.id}
+              onPress={() => onToggle(exercise.id)}
+              style={({ pressed }) => [styles.exerciseRow, pressed && styles.pressed, exercise.completed && styles.exerciseRowDone]}
+            >
+              <View style={[styles.numBadge, exercise.completed && styles.numBadgeDone]}>
+                {exercise.completed ? (
+                  <MaterialIcons name="check" color={brand.text} size={14} />
+                ) : (
+                  <Text style={styles.numText}>{index + 1}</Text>
+                )}
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.exerciseName, exercise.completed && styles.textDone]}>
+                  {exercise.name}
+                </Text>
+                <Text style={styles.prescriptionText}>{exercise.prescription}</Text>
+              </View>
+
+              <MaterialIcons
+                name={exercise.completed ? "check-circle" : "radio-button-unchecked"}
+                color={exercise.completed ? brand.success : brand.dim}
+                size={22}
+              />
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  center: { alignItems: "center", flex: 1, gap: 12, justifyContent: "center", padding: 24 },
+  message: { color: brand.muted, fontSize: 14, textAlign: "center" },
+  menuBtn: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },
+  content: { gap: 14, paddingBottom: 24, paddingTop: 10 },
+  metricsRow: { flexDirection: "row", gap: 8 },
+  metricCard: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flex: 1,
+    gap: 4,
+    paddingVertical: 12,
+  },
+  metricValue: { color: brand.text, fontSize: 16, fontWeight: "900" },
+  metricLabel: { color: brand.muted, fontSize: 9 },
+  overallProgressCard: {
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+  },
+  overallHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  overallTitle: { color: brand.blueGlow, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
+  overallRatio: { color: brand.muted, fontSize: 11, fontWeight: "700" },
+  trackBar: { backgroundColor: brand.border, borderRadius: 6, height: 6, overflow: "hidden" },
+  fillBar: { backgroundColor: brand.blueGlow, borderRadius: 6, height: "100%" },
+  sessionCard: {
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: "hidden",
+    padding: 16,
+  },
+  sessionHead: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  sessionTitle: { color: brand.text, fontSize: 15, fontWeight: "900" },
+  sessionSub: { color: brand.muted, fontSize: 12, marginTop: 3 },
+  sessionTrack: { backgroundColor: brand.border, borderRadius: 6, height: 3, marginTop: 12, overflow: "hidden" },
+  sessionTrackFill: { backgroundColor: brand.blueGlow, borderRadius: 6, height: "100%" },
+  exerciseList: { gap: 8, marginTop: 14 },
+  exerciseRow: {
+    alignItems: "center",
+    backgroundColor: brand.background,
+    borderColor: brand.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 56,
+    paddingHorizontal: 12,
+  },
+  exerciseRowDone: {
+    backgroundColor: "rgba(16, 185, 129, 0.05)",
+    borderColor: "rgba(16, 185, 129, 0.2)",
+  },
+  numBadge: {
+    alignItems: "center",
+    borderColor: brand.blueGlow,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 24,
+    justifyContent: "center",
+    width: 24,
+  },
+  numBadgeDone: { backgroundColor: brand.success, borderColor: brand.success },
+  numText: { color: brand.blueGlow, fontSize: 11, fontWeight: "900" },
+  exerciseName: { color: brand.text, fontSize: 13, fontWeight: "800" },
+  textDone: { color: brand.muted, textDecorationLine: "line-through" },
+  prescriptionText: { color: brand.blueLight, fontSize: 11, fontWeight: "700", marginTop: 1 },
+  startBtn: { marginBottom: 4 },
+  pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
+});
+

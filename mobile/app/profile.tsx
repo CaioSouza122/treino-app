@@ -18,10 +18,10 @@ import { haptic } from "@/lib/haptics";
 import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
 
 const menu = [
-  { icon: "fitness-center", label: "Meus treinos" },
-  { icon: "auto-awesome", label: "Montar treino com IA" },
-  { icon: "history", label: "Histórico" },
-  { icon: "bar-chart", label: "Progresso" },
+  { icon: "fitness-center", label: "Meus Treinos" },
+  { icon: "psychology", label: "Montar Treino com IA" },
+  { icon: "history", label: "Histórico de Planos" },
+  { icon: "insights", label: "Métricas & Progresso" },
   { icon: "settings", label: "Configurações" },
 ] as const;
 
@@ -71,7 +71,7 @@ export default function ProfileScreen() {
       className="px-0"
     >
       <View style={styles.fill}>
-        {/* ── Scrim (fundo escuro clicável para fechar) ─────────────── */}
+        {/* ── Scrim ─────────────────────────────────────────────── */}
         <Animated.View
           entering={FadeIn.duration(180).reduceMotion(ReduceMotion.System)}
           style={styles.scrim}
@@ -84,38 +84,44 @@ export default function ProfileScreen() {
           entering={SlideInLeft.duration(240).reduceMotion(ReduceMotion.System)}
           style={styles.drawer}
         >
-          {/* Cabeçalho do drawer */}
+          {/* Header */}
           <View style={styles.drawerTop}>
             <Pressable
               accessibilityLabel="Fechar perfil"
               onPress={() => router.back()}
-              style={styles.close}
+              style={styles.closeBtn}
             >
               <MaterialIcons name="close" color={brand.muted} size={22} />
             </Pressable>
-            <BrandMark size={40} />
+            <BrandMark size={36} />
           </View>
 
           <ScrollView
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
           >
-            {/* ── Avatar ───────────────────────────────────────────── */}
-            <View style={styles.profile}>
-              <View style={styles.avatar}>
+            {/* ── Profile Header ───────────────────────────────────── */}
+            <View style={styles.profileHeader}>
+              <View style={styles.avatarRing}>
                 <Text style={styles.avatarText}>
-                  {profile.name.slice(0, 2).toUpperCase()}
+                  {(profile.name || "AT").slice(0, 2).toUpperCase()}
                 </Text>
+                <View style={styles.proBadge}>
+                  <Text style={styles.proText}>PRO</Text>
+                </View>
               </View>
-              <Text style={styles.name}>{profile.name || "Seu perfil"}</Text>
-              <Text style={styles.plan}>Perfil de treino personalizado</Text>
+              <Text style={styles.name}>{profile.name || "Atleta"}</Text>
+              <Text style={styles.planSub}>Perfil Atleta Otimizado</Text>
             </View>
 
-            {/* ── Formulário ───────────────────────────────────────── */}
-            <Text style={styles.sectionTitle}>Dados para a IA</Text>
+            {/* ── Form Data ───────────────────────────────────────── */}
+            <View style={styles.sectionHeaderRow}>
+              <MaterialIcons name="tune" size={16} color={brand.blueGlow} />
+              <Text style={styles.sectionTitle}>Parâmetros Físicos</Text>
+            </View>
 
             <Field
-              label="Nome"
+              label="Nome do Atleta"
               value={profile.name}
               onChangeText={(name) => {
                 setProfile((current: UserProfile) => ({ ...current, name }));
@@ -146,7 +152,7 @@ export default function ProfileScreen() {
                 onChangeText={(value) => updateNumber("idade", value)}
               />
               <Field
-                label="Dias/semana"
+                label="Frequência (dias/sem)"
                 value={String(profile.vezes_por_semana)}
                 keyboardType="numeric"
                 onChangeText={(value) => updateNumber("vezes_por_semana", value)}
@@ -155,13 +161,13 @@ export default function ProfileScreen() {
 
             <View style={styles.row}>
               <Field
-                label="Tempo (min)"
+                label="Tempo/Sessão (min)"
                 value={String(profile.tempo)}
                 keyboardType="numeric"
                 onChangeText={(value) => updateNumber("tempo", value)}
               />
               <Field
-                label="Nível"
+                label="Nível Experiência"
                 value={profile.nivel}
                 onChangeText={(nivel) => {
                   setProfile((current: UserProfile) => ({ ...current, nivel }));
@@ -171,7 +177,7 @@ export default function ProfileScreen() {
             </View>
 
             <Field
-              label="Objetivo"
+              label="Objetivo Principal"
               value={profile.objetivo}
               onChangeText={(objetivo) => {
                 setProfile((current: UserProfile) => ({ ...current, objetivo }));
@@ -179,50 +185,50 @@ export default function ProfileScreen() {
               }}
             />
 
-            {/* ── Botão salvar ─────────────────────────────────────── */}
+            {/* ── Save Button ─────────────────────────────────────── */}
             <Pressable
               onPress={handleSave}
               disabled={saving}
               style={({ pressed }) => [
-                styles.save,
+                styles.saveBtn,
                 pressed && styles.pressed,
                 saving && styles.disabled,
               ]}
             >
-              <MaterialIcons name="save" color={brand.text} size={19} />
+              <MaterialIcons name={saved ? "check" : "save"} color={brand.text} size={18} />
               <Text style={styles.saveText}>
-                {saving ? "Salvando..." : saved ? "Perfil salvo" : "Salvar perfil"}
+                {saving ? "Atualizando..." : saved ? "Dados Atualizados" : "Salvar Configurações"}
               </Text>
             </Pressable>
 
-            {/* ── Menu de navegação ─────────────────────────────────── */}
-            <View style={styles.list}>
+            {/* ── Navigation Links ─────────────────────────────────── */}
+            <View style={styles.menuList}>
               {menu.map((item) => (
                 <Pressable
                   key={item.label}
                   onPress={() => {
                     haptic.light();
-                    if (item.label === "Meus treinos" || item.label === "Histórico")
+                    if (item.label === "Meus Treinos" || item.label === "Histórico de Planos")
                       router.replace("/(tabs)/plans" as never);
-                    if (item.label === "Montar treino com IA")
+                    if (item.label === "Montar Treino com IA")
                       router.replace("/(tabs)/chat" as never);
                   }}
-                  style={({ pressed }) => [styles.item, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
                 >
-                  <MaterialIcons name={item.icon} size={22} color={brand.blueLight} />
-                  <Text style={styles.itemText}>{item.label}</Text>
-                  <MaterialIcons name="chevron-right" size={21} color={brand.dim} />
+                  <MaterialIcons name={item.icon} size={20} color={brand.blueGlow} />
+                  <Text style={styles.menuText}>{item.label}</Text>
+                  <MaterialIcons name="chevron-right" size={20} color={brand.dim} />
                 </Pressable>
               ))}
             </View>
 
-            {/* ── Logout ───────────────────────────────────────────── */}
+            {/* ── Logout Button ───────────────────────────────────── */}
             <Pressable
               onPress={() => router.replace("/")}
-              style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.logoutBtn, pressed && styles.pressed]}
             >
-              <MaterialIcons name="logout" size={21} color={brand.danger} />
-              <Text style={styles.logoutText}>Sair da conta</Text>
+              <MaterialIcons name="logout" size={20} color={brand.danger} />
+              <Text style={styles.logoutText}>Encerrar Sessão</Text>
             </Pressable>
           </ScrollView>
         </Animated.View>
@@ -243,7 +249,7 @@ function Field({
   keyboardType?: "default" | "numeric" | "decimal-pad";
 }) {
   return (
-    <View style={styles.field}>
+    <View style={styles.fieldBox}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
@@ -258,29 +264,90 @@ function Field({
 
 const styles = StyleSheet.create({
   fill: { backgroundColor: "transparent", flex: 1 },
-  scrim: { backgroundColor: "rgba(0,0,0,0.52)", bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
+  scrim: { backgroundColor: "rgba(0,0,0,0.65)", bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
   fullPress: { flex: 1 },
-  drawer: { backgroundColor: brand.background, borderBottomRightRadius: 28, borderTopRightRadius: 28, height: "100%", width: "92%" },
-  drawerTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 8 },
-  close: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },
-  content: { gap: 15, padding: 20 },
-  profile: { alignItems: "center" },
-  avatar: { alignItems: "center", backgroundColor: brand.blueSoft, borderColor: brand.blue, borderRadius: 44, borderWidth: 2, height: 78, justifyContent: "center", width: 78 },
-  avatarText: { color: brand.text, fontSize: 21, fontWeight: "900" },
-  name: { color: brand.text, fontSize: 22, fontWeight: "900", marginTop: 10 },
-  plan: { color: brand.muted, fontSize: 12, marginTop: 4 },
-  sectionTitle: { color: brand.text, fontSize: 17, fontWeight: "900", marginTop: 5 },
+  drawer: {
+    backgroundColor: brand.background,
+    borderBottomRightRadius: 28,
+    borderColor: brand.border,
+    borderRightWidth: 1,
+    borderTopRightRadius: 28,
+    height: "100%",
+    width: "90%",
+  },
+  drawerTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 10 },
+  closeBtn: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },
+  content: { gap: 14, padding: 18 },
+  profileHeader: { alignItems: "center", marginVertical: 6 },
+  avatarRing: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceElevated,
+    borderColor: brand.blueGlow,
+    borderRadius: 40,
+    borderWidth: 2,
+    height: 72,
+    justifyContent: "center",
+    position: "relative",
+    width: 72,
+  },
+  avatarText: { color: brand.text, fontSize: 20, fontWeight: "900" },
+  proBadge: {
+    backgroundColor: brand.blue,
+    borderRadius: 4,
+    bottom: -4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    position: "absolute",
+  },
+  proText: { color: brand.text, fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
+  name: { color: brand.text, fontSize: 20, fontWeight: "900", marginTop: 10 },
+  planSub: { color: brand.muted, fontSize: 11, marginTop: 2 },
+  sectionHeaderRow: { alignItems: "center", flexDirection: "row", gap: 6, marginTop: 4 },
+  sectionTitle: { color: brand.text, fontSize: 14, fontWeight: "900" },
   row: { flexDirection: "row", gap: 10 },
-  field: { flex: 1, gap: 6 },
-  label: { color: brand.muted, fontSize: 11, fontWeight: "700" },
-  input: { backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 12, borderWidth: 1, color: brand.text, fontSize: 14, minHeight: 42, paddingHorizontal: 11 },
-  save: { alignItems: "center", backgroundColor: brand.blue, borderRadius: 14, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 48 },
+  fieldBox: { flex: 1, gap: 5 },
+  label: { color: brand.muted, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  input: {
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: brand.text,
+    fontSize: 14,
+    fontWeight: "600",
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  saveBtn: {
+    alignItems: "center",
+    backgroundColor: brand.blue,
+    borderRadius: 14,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    minHeight: 48,
+    marginTop: 4,
+  },
   saveText: { color: brand.text, fontSize: 14, fontWeight: "900" },
-  disabled: { opacity: 0.55 },
-  list: { borderTopColor: brand.border, borderTopWidth: 1, marginTop: 4 },
-  item: { alignItems: "center", borderBottomColor: brand.border, borderBottomWidth: 1, flexDirection: "row", gap: 14, minHeight: 52 },
-  itemText: { color: brand.text, flex: 1, fontSize: 14, fontWeight: "700" },
-  logout: { alignItems: "center", flexDirection: "row", gap: 13, minHeight: 50, paddingHorizontal: 4 },
-  logoutText: { color: brand.danger, fontSize: 15, fontWeight: "800" },
-  pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
+  disabled: { opacity: 0.5 },
+  menuList: { borderColor: brand.border, borderTopWidth: 1, marginTop: 8, paddingTop: 4 },
+  menuItem: {
+    alignItems: "center",
+    borderColor: brand.border,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 48,
+  },
+  menuText: { color: brand.text, flex: 1, fontSize: 13, fontWeight: "700" },
+  logoutBtn: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 46,
+    paddingHorizontal: 4,
+  },
+  logoutText: { color: brand.danger, fontSize: 14, fontWeight: "800" },
+  pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
 });
+

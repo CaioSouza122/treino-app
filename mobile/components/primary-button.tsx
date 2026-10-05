@@ -8,33 +8,93 @@ type PrimaryButtonProps = {
   label: string;
   onPress: () => void;
   icon?: ReactNode;
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "accent";
   style?: ViewStyle;
   disabled?: boolean;
 };
 
-export function PrimaryButton({ label, onPress, icon, variant = "primary", style, disabled = false }: PrimaryButtonProps) {
+export function PrimaryButton({
+  label,
+  onPress,
+  icon,
+  variant = "primary",
+  style,
+  disabled = false,
+}: PrimaryButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={() => { haptic.light(); onPress(); }}
-      style={({ pressed }) => [styles.base, styles[variant], style, disabled && styles.disabled, pressed && styles.pressed]}
+      onPress={() => {
+        haptic.light();
+        onPress();
+      }}
+      style={({ pressed }) => [
+        styles.base,
+        styles[variant],
+        style,
+        disabled && styles.disabled,
+        pressed && styles.pressed,
+      ]}
     >
       {icon}
-      <Text style={[styles.label, variant !== "primary" && styles.secondaryLabel]}>{label}</Text>
+      <Text style={[styles.label, styles[`${variant}Label` as keyof typeof styles]]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  base: { alignItems: "center", borderRadius: 16, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 56, paddingHorizontal: 20 },
-  primary: { backgroundColor: brand.blue },
-  secondary: { backgroundColor: brand.surface, borderColor: brand.blue, borderWidth: 1 },
-  ghost: { backgroundColor: "transparent" },
-  label: { color: brand.text, fontSize: 16, fontWeight: "800" },
-  secondaryLabel: { color: brand.blueLight },
-  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
-  disabled: { opacity: 0.45 },
+  base: {
+    alignItems: "center",
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+    minHeight: 54,
+    paddingHorizontal: 20,
+  },
+  primary: {
+    backgroundColor: brand.blue,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderWidth: 1,
+  },
+  secondary: {
+    backgroundColor: brand.surfaceElevated,
+    borderColor: brand.borderHighlight,
+    borderWidth: 1,
+  },
+  accent: {
+    backgroundColor: "rgba(0, 240, 255, 0.12)",
+    borderColor: brand.blueGlow,
+    borderWidth: 1,
+  },
+  ghost: {
+    backgroundColor: "transparent",
+  },
+  label: {
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+  primaryLabel: {
+    color: brand.text,
+  },
+  secondaryLabel: {
+    color: brand.text,
+  },
+  accentLabel: {
+    color: brand.blueGlow,
+  },
+  ghostLabel: {
+    color: brand.blueLight,
+  },
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+  disabled: {
+    opacity: 0.4,
+  },
 });
+

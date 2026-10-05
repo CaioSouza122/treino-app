@@ -35,11 +35,13 @@ export default function HomeScreen() {
       });
   }, []);
 
-  const today = new Date().toLocaleDateString("pt-BR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "short",
-  }).toUpperCase();
+  const today = new Date()
+    .toLocaleDateString("pt-BR", {
+      weekday: "long",
+      day: "2-digit",
+      month: "short",
+    })
+    .toUpperCase();
 
   return (
     <ScreenContainer className="px-5">
@@ -50,10 +52,12 @@ export default function HomeScreen() {
         {/* ── Topbar ─────────────────────────────────────────────────── */}
         <View style={styles.topbar}>
           <View>
-            <Text style={styles.eyebrow}>{today}</Text>
+            <View style={styles.dateBadge}>
+              <MaterialIcons name="calendar-today" color={brand.blueGlow} size={11} />
+              <Text style={styles.eyebrow}>{today}</Text>
+            </View>
             <Text style={styles.greeting}>
-              Olá,{" "}
-              <Text style={styles.accent}>{profile?.name || "atleta"}</Text>
+              Olá, <Text style={styles.accent}>{profile?.name || "Atleta"}</Text>
             </Text>
           </View>
           <Pressable
@@ -67,36 +71,46 @@ export default function HomeScreen() {
             <Text style={styles.avatarText}>
               {(profile?.name || "AT").slice(0, 2).toUpperCase()}
             </Text>
+            <View style={styles.onlineDot} />
           </Pressable>
         </View>
 
-        {/* ── Hero card ──────────────────────────────────────────────── */}
+        {/* ── AI Engine Hero Card ─────────────────────────────────────── */}
         <Entrance delay={60}>
-          <View style={styles.hero}>
-            <View style={styles.heroTitleRow}>
-              <BrandMark size={50} />
-              <View style={styles.heroCopy}>
-                <Text style={styles.heroTitle}>
-                  Monte seu treino{`\n`}
-                  <Text style={styles.accent}>com IA</Text>
-                </Text>
-                <Text style={styles.heroDescription}>
-                  Plano ajustado ao seu objetivo e rotina.
-                </Text>
+          <View style={styles.heroCard}>
+            <View style={styles.heroHeader}>
+              <BrandMark size={46} />
+              <View style={styles.liveChip}>
+                <View style={styles.pulseDot} />
+                <Text style={styles.liveChipText}>ENGINE IA ATIVA</Text>
               </View>
             </View>
+
+            <View style={styles.heroBody}>
+              <Text style={styles.heroTitle}>
+                Plano de Carga <Text style={styles.accent}>Inteligente</Text>
+              </Text>
+              <Text style={styles.heroSub}>
+                Algoritmo otimizado para progressão contínua de hipertrofia e volume muscular.
+              </Text>
+            </View>
+
             <PrimaryButton
-              label="Começar conversa"
+              label="Gerar Novo Plano com IA"
               onPress={() => router.push("/(tabs)/chat" as never)}
-              icon={<MaterialIcons name="auto-awesome" color={brand.text} size={18} />}
+              variant="accent"
+              icon={<MaterialIcons name="psychology" color={brand.blueGlow} size={20} />}
               style={styles.heroButton}
             />
           </View>
         </Entrance>
 
-        {/* ── Treino atual ───────────────────────────────────────────── */}
+        {/* ── Treino Atual ───────────────────────────────────────────── */}
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Seu treino atual</Text>
+          <View style={styles.sectionTitleWrap}>
+            <MaterialIcons name="fitness-center" color={brand.blueLight} size={18} />
+            <Text style={styles.sectionTitle}>Sessão Atual</Text>
+          </View>
           <Pressable onPress={() => router.push("/workout-detail" as never)}>
             <Text style={styles.textButton}>Ver detalhes</Text>
           </Pressable>
@@ -107,55 +121,61 @@ export default function HomeScreen() {
             onPress={() => router.push("/workout-detail" as never)}
             style={({ pressed }) => [styles.workoutCard, pressed && styles.pressed]}
           >
-            <View style={styles.workoutIcon}>
-              <MaterialIcons name="fitness-center" color={brand.blueLight} size={25} />
+            <View style={styles.workoutIconBox}>
+              <MaterialIcons name="sports-gymnastics" color={brand.blueGlow} size={24} />
             </View>
             <View style={styles.workoutBody}>
               <View style={styles.workoutLine}>
-                <Text style={styles.workoutTitle}>
-                  {latest?.days[0]?.foco || "Nenhum treino gerado"}
+                <Text style={styles.workoutTitle} numberOfLines={1}>
+                  {latest?.days[0]?.foco || "Nenhum plano gerado"}
                 </Text>
-                <Text style={styles.pill}>{latest ? "RECENTE" : "IA"}</Text>
+                <View style={styles.statusTag}>
+                  <Text style={styles.statusTagText}>
+                    {latest ? "PRONTO" : "AGUARDANDO"}
+                  </Text>
+                </View>
               </View>
               <Text style={styles.workoutMeta}>
                 {latest
-                  ? `${latest.days.length} sessões · ${latest.days[0]?.dia || "Treino personalizado"}`
-                  : "Gere seu primeiro plano com a IA"}
+                  ? `${latest.days.length} dias/semana · ${latest.days[0]?.dia || "Treino A"}`
+                  : "Gere seu primeiro plano na aba Coach IA"}
               </Text>
               <View style={styles.progressTrack}>
                 <View
                   style={[styles.progressFill, { width: latest ? "100%" : "0%" }]}
                 />
               </View>
-              <Text style={styles.progressText}>
-                {latest ? "Treino disponível" : "Aguardando geração"}
-              </Text>
             </View>
-            <MaterialIcons name="chevron-right" color={brand.muted} size={25} />
+            <MaterialIcons name="chevron-right" color={brand.dim} size={24} />
           </Pressable>
         </Entrance>
 
-        {/* ── Atividade de hoje ──────────────────────────────────────── */}
-        <Text style={[styles.sectionTitle, styles.activityTitle]}>
-          Atividade de hoje
-        </Text>
+        {/* ── Atividade e Métricas ───────────────────────────────────── */}
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionTitleWrap}>
+            <MaterialIcons name="insights" color={brand.neonLime} size={18} />
+            <Text style={styles.sectionTitle}>Métricas de Desempenho</Text>
+          </View>
+        </View>
 
         <Entrance delay={180}>
-          <View style={styles.stats}>
-            <Stat icon="timer" value="45" label="minutos" />
-            <Stat icon="local-fire-department" value="2.800" label="kcal" />
-            <Stat icon="directions-walk" value="12" label="séries" />
+          <View style={styles.statsGrid}>
+            <StatBox icon="timer" value="45" label="min/sessão" color={brand.blueGlow} />
+            <StatBox icon="local-fire-department" value="2.8k" label="kcal estimadas" color={brand.neonLime} />
+            <StatBox icon="format-list-numbered" value="12" label="séries totais" color={brand.violet} />
           </View>
         </Entrance>
 
-        {/* ── Dica ───────────────────────────────────────────────────── */}
+        {/* ── Orientação do Treinador ──────────────────────────────── */}
         <Entrance delay={220}>
-          <View style={styles.tip}>
-            <MaterialIcons name="bolt" color={brand.blueLight} size={20} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.tipTitle}>Dica do treinador</Text>
+          <View style={styles.tipCard}>
+            <View style={styles.tipIconWrap}>
+              <MaterialIcons name="lightbulb" color={brand.blueGlow} size={20} />
+            </View>
+            <View style={styles.tipContent}>
+              <Text style={styles.tipTitle}>RECOMENDAÇÃO TÉCNICA</Text>
               <Text style={styles.tipText}>
-                Mantenha 60–90 segundos de descanso entre as séries de hoje.
+                Descanso de 60 a 90 segundos garante maior ressíntese de ATP para cargas pesadas.
               </Text>
             </View>
           </View>
@@ -165,18 +185,22 @@ export default function HomeScreen() {
   );
 }
 
-function Stat({
+function StatBox({
   icon,
   value,
   label,
+  color,
 }: {
   icon: keyof typeof MaterialIcons.glyphMap;
   value: string;
   label: string;
+  color: string;
 }) {
   return (
-    <View style={styles.stat}>
-      <MaterialIcons name={icon} color={brand.blueLight} size={22} />
+    <View style={styles.statItem}>
+      <View style={[styles.statIconBadge, { backgroundColor: `${color}15`, borderColor: `${color}40` }]}>
+        <MaterialIcons name={icon} color={color} size={18} />
+      </View>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -184,39 +208,158 @@ function Stat({
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 20, paddingBottom: 28, paddingTop: 14 },
+  content: { gap: 18, paddingBottom: 28, paddingTop: 12 },
   topbar: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  eyebrow: { color: brand.muted, fontSize: 11, fontWeight: "800", letterSpacing: 0.6 },
-  greeting: { color: brand.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.7, marginTop: 4 },
-  accent: { color: brand.blueLight },
-  avatar: { alignItems: "center", backgroundColor: brand.blueSoft, borderColor: brand.blue, borderRadius: 24, borderWidth: 1.5, height: 48, justifyContent: "center", width: 48 },
+  dateBadge: { alignItems: "center", flexDirection: "row", gap: 5 },
+  eyebrow: { color: brand.muted, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
+  greeting: { color: brand.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.6, marginTop: 4 },
+  accent: { color: brand.blueGlow },
+  avatar: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceElevated,
+    borderColor: brand.blueGlow,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    height: 44,
+    justifyContent: "center",
+    position: "relative",
+    width: 44,
+  },
   avatarText: { color: brand.text, fontSize: 13, fontWeight: "900" },
-  hero: { backgroundColor: brand.surface, borderColor: brand.blue, borderRadius: 22, borderWidth: 1, padding: 18 },
-  heroTitleRow: { flexDirection: "row", gap: 12 },
-  heroCopy: { flex: 1 },
-  heroTitle: { color: brand.text, fontSize: 23, fontWeight: "900", letterSpacing: -0.5, lineHeight: 27 },
-  heroDescription: { color: brand.muted, fontSize: 13, lineHeight: 18, marginTop: 7 },
-  heroButton: { marginTop: 18 },
-  sectionHead: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
-  sectionTitle: { color: brand.text, fontSize: 19, fontWeight: "900", letterSpacing: -0.35 },
-  textButton: { color: brand.blueLight, fontSize: 13, fontWeight: "800" },
-  workoutCard: { alignItems: "center", backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 20, borderWidth: 1, flexDirection: "row", gap: 13, padding: 16 },
-  workoutIcon: { alignItems: "center", backgroundColor: brand.blueSoft, borderRadius: 16, height: 50, justifyContent: "center", width: 50 },
+  onlineDot: {
+    backgroundColor: brand.neonLime,
+    borderRadius: 5,
+    bottom: 0,
+    height: 10,
+    position: "absolute",
+    right: 0,
+    width: 10,
+  },
+  heroCard: {
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.borderHighlight,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+  },
+  heroHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justify: "space-between",
+  },
+  liveChip: {
+    alignItems: "center",
+    backgroundColor: "rgba(0, 240, 255, 0.08)",
+    borderColor: "rgba(0, 240, 255, 0.3)",
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pulseDot: {
+    backgroundColor: brand.blueGlow,
+    borderRadius: 4,
+    height: 6,
+    width: 6,
+  },
+  liveChipText: {
+    color: brand.blueGlow,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  heroBody: { marginVertical: 14 },
+  heroTitle: { color: brand.text, fontSize: 22, fontWeight: "900", letterSpacing: -0.5, lineHeight: 28 },
+  heroSub: { color: brand.muted, fontSize: 13, lineHeight: 19, marginTop: 6 },
+  heroButton: { marginTop: 4 },
+  sectionHead: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  sectionTitleWrap: { alignItems: "center", flexDirection: "row", gap: 8 },
+  sectionTitle: { color: brand.text, fontSize: 17, fontWeight: "900", letterSpacing: -0.3 },
+  textButton: { color: brand.blueGlow, fontSize: 12, fontWeight: "800" },
+  workoutCard: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 14,
+    padding: 16,
+  },
+  workoutIconBox: {
+    alignItems: "center",
+    backgroundColor: "rgba(0, 240, 255, 0.08)",
+    borderColor: "rgba(0, 240, 255, 0.2)",
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
   workoutBody: { flex: 1 },
   workoutLine: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  workoutTitle: { color: brand.text, fontSize: 17, fontWeight: "800" },
-  pill: { color: brand.blueLight, fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
-  workoutMeta: { color: brand.muted, fontSize: 13, marginTop: 4 },
-  progressTrack: { backgroundColor: "#262D3A", borderRadius: 20, height: 6, marginTop: 13, overflow: "hidden" },
-  progressFill: { backgroundColor: brand.blue, borderRadius: 20, height: "100%", width: "65%" },
-  progressText: { color: brand.blueLight, fontSize: 11, fontWeight: "800", marginTop: 5 },
-  activityTitle: { marginTop: 4 },
-  stats: { backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 18, borderWidth: 1, flexDirection: "row", paddingVertical: 15 },
-  stat: { alignItems: "center", flex: 1, gap: 2 },
-  statValue: { color: brand.text, fontSize: 18, fontWeight: "900", marginTop: 3 },
-  statLabel: { color: brand.muted, fontSize: 11 },
-  tip: { alignItems: "flex-start", backgroundColor: "#0C1A33", borderRadius: 16, flexDirection: "row", gap: 10, padding: 14 },
-  tipTitle: { color: brand.text, fontSize: 13, fontWeight: "800" },
-  tipText: { color: brand.muted, fontSize: 12, lineHeight: 17, marginTop: 3 },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  workoutTitle: { color: brand.text, flex: 1, fontSize: 16, fontWeight: "800" },
+  statusTag: {
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    borderColor: brand.success,
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  statusTagText: { color: brand.success, fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
+  workoutMeta: { color: brand.muted, fontSize: 12, marginTop: 3 },
+  progressTrack: { backgroundColor: brand.border, borderRadius: 10, height: 4, marginTop: 10, overflow: "hidden" },
+  progressFill: { backgroundColor: brand.blueGlow, borderRadius: 10, height: "100%" },
+  statsGrid: { flexDirection: "row", gap: 10 },
+  statItem: {
+    alignItems: "center",
+    backgroundColor: brand.surfaceCard,
+    borderColor: brand.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flex: 1,
+    paddingVertical: 14,
+  },
+  statIconBadge: {
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: "center",
+    marginBottom: 8,
+    width: 34,
+  },
+  statValue: { color: brand.text, fontSize: 17, fontWeight: "900" },
+  statLabel: { color: brand.muted, fontSize: 10, marginTop: 2 },
+  tipCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(19, 35, 66, 0.5)",
+    borderColor: brand.borderHighlight,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 16,
+  },
+  tipIconWrap: {
+    alignItems: "center",
+    backgroundColor: "rgba(0, 240, 255, 0.1)",
+    borderRadius: 12,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  tipContent: { flex: 1 },
+  tipTitle: { color: brand.blueGlow, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
+  tipText: { color: brand.muted, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
 });
+
