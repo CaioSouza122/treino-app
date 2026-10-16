@@ -1,6 +1,7 @@
-import { View, type ViewProps } from "react-native";
+import { StyleSheet, View, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
+import { brand, ui } from "@/constants/brand";
 import { cn } from "@/lib/utils";
 
 export interface ScreenContainerProps extends ViewProps {
@@ -21,6 +22,10 @@ export interface ScreenContainerProps extends ViewProps {
    * Additional className for the SafeAreaView (content layer).
    */
   safeAreaClassName?: string;
+  /**
+   * Applies the standard horizontal screen padding. Defaults to true.
+   */
+  padded?: boolean;
 }
 
 /**
@@ -44,12 +49,13 @@ export function ScreenContainer({
   className,
   containerClassName,
   safeAreaClassName,
+  padded = true,
   style,
   ...props
 }: ScreenContainerProps) {
   return (
     <View
-      style={{ backgroundColor: "#08090D", flex: 1, minHeight: 0 }}
+      style={{ backgroundColor: brand.background, flex: 1, minHeight: 0 }}
       className={cn(
         "flex-1",
         "bg-background",
@@ -62,10 +68,15 @@ export function ScreenContainer({
         className={cn("flex-1", safeAreaClassName)}
         style={[{ flex: 1, minHeight: 0 }, style]}
       >
-        <View className={cn("flex-1", className)} style={{ flex: 1, minHeight: 0 }}>
+        <View className={cn("flex-1", className)} style={[styles.content, padded && styles.padded]}>
           {children}
         </View>
       </SafeAreaView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  content: { flex: 1, minHeight: 0 },
+  padded: { paddingHorizontal: ui.screenPadding },
+});

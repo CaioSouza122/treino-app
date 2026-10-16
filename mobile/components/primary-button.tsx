@@ -33,9 +33,9 @@ export function PrimaryButton({
       style={({ pressed }) => [
         styles.base,
         styles[variant],
+        pressed && pressedStyles[variant],
         style,
         disabled && styles.disabled,
-        pressed && styles.pressed,
       ]}
     >
       {icon}
@@ -44,57 +44,31 @@ export function PrimaryButton({
   );
 }
 
+const pressedStyles = StyleSheet.create({
+  primary: { backgroundColor: brand.accentPressed },
+  secondary: { backgroundColor: brand.border },
+  accent: { opacity: 0.8 },
+  ghost: { opacity: 0.6 },
+});
+
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: 14,
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     justifyContent: "center",
-    minHeight: 54,
+    minHeight: 52,
     paddingHorizontal: 20,
   },
-  primary: {
-    backgroundColor: brand.blue,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    borderWidth: 1,
-  },
-  secondary: {
-    backgroundColor: brand.surfaceElevated,
-    borderColor: brand.borderHighlight,
-    borderWidth: 1,
-  },
-  accent: {
-    backgroundColor: "rgba(0, 240, 255, 0.12)",
-    borderColor: brand.blueGlow,
-    borderWidth: 1,
-  },
-  ghost: {
-    backgroundColor: "transparent",
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: "900",
-    letterSpacing: 0.2,
-  },
-  primaryLabel: {
-    color: brand.text,
-  },
-  secondaryLabel: {
-    color: brand.text,
-  },
-  accentLabel: {
-    color: brand.blueGlow,
-  },
-  ghostLabel: {
-    color: brand.blueLight,
-  },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  disabled: {
-    opacity: 0.4,
-  },
+  primary: { backgroundColor: brand.accent },
+  secondary: { backgroundColor: brand.surfaceElevated, borderColor: brand.border, borderWidth: 1 },
+  accent: { backgroundColor: brand.accentSoft },
+  ghost: { backgroundColor: "transparent" },
+  label: { fontSize: 15, fontWeight: "600" },
+  primaryLabel: { color: "#FFFFFF" },
+  secondaryLabel: { color: brand.text },
+  accentLabel: { color: brand.accentText },
+  ghostLabel: { color: brand.accentText },
+  disabled: { opacity: 0.45 },
 });
-

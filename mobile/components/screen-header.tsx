@@ -11,23 +11,29 @@ export function ScreenHeader({ title, subtitle, right }: ScreenHeaderProps) {
   const router = useRouter();
   return (
     <View style={styles.header}>
-      <Pressable accessibilityLabel="Voltar" onPress={() => { haptic.light(); router.back(); }} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-        <MaterialIcons name="arrow-back" size={25} color={brand.text} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Voltar"
+        hitSlop={8}
+        onPress={() => { haptic.light(); router.back(); }}
+        style={({ pressed }) => [styles.side, pressed && styles.pressed]}
+      >
+        <MaterialIcons name="arrow-back-ios-new" size={20} color={brand.text} />
       </Pressable>
       <View style={styles.titleArea}>
         <Text numberOfLines={1} style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        {subtitle ? <Text numberOfLines={1} style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
-      {right ?? <View style={styles.back} />}
+      {right ?? <View style={styles.side} />}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 52 },
-  back: { alignItems: "center", height: 42, justifyContent: "center", width: 42 },
-  titleArea: { flex: 1 },
-  title: { color: brand.text, fontSize: 19, fontWeight: "800" },
-  subtitle: { color: brand.muted, fontSize: 13, marginTop: 2 },
-  pressed: { opacity: 0.65 },
+  header: { alignItems: "center", flexDirection: "row", gap: 8, minHeight: 52 },
+  side: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },
+  titleArea: { alignItems: "center", flex: 1 },
+  title: { color: brand.text, fontSize: 16, fontWeight: "600" },
+  subtitle: { color: brand.muted, fontSize: 12, marginTop: 1 },
+  pressed: { opacity: 0.6 },
 });
