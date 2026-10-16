@@ -36,7 +36,7 @@ export default function PlansScreen() {
 
   return (
     <ScreenContainer className="px-5">
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* ── Header ─────────────────────────────────────────────────── */}
         <View style={styles.header}>
           <View>
@@ -155,6 +155,7 @@ export default function PlansScreen() {
 }
 
 const styles = StyleSheet.create({
+  scrollView: { flex: 1, minHeight: 0, overflow: "scroll" },
   content: { gap: 16, paddingBottom: 28, paddingTop: 14 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   eyebrowBadge: { alignItems: "center", flexDirection: "row", gap: 5 },

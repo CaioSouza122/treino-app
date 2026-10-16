@@ -111,7 +111,7 @@ export default function WorkoutDetailScreen() {
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5">
-      <View style={styles.fill}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <ScreenHeader
           title={sessions[0]?.subtitle || "Plano Hipertrofia"}
           subtitle={`OTIMIZADO POR IA · ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`}
@@ -122,31 +122,29 @@ export default function WorkoutDetailScreen() {
           }
         />
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Métricas do treino */}
-          <View style={styles.metricsRow}>
-            <MetricBox icon="event-repeat" value={String(sessions.length)} label="dias/sem" color={brand.blueGlow} />
-            <MetricBox icon="timer" value={sessions[0]?.duration.replace(" min", "") || "50"} label="min/sessão" color={brand.neonLime} />
-            <MetricBox icon="fitness-center" value={String(sessions.reduce((sum, session) => sum + session.exercises.length, 0))} label="exercícios" color={brand.violet} />
-            <MetricBox icon="insights" value="ALTA" label="intensidade" color={brand.success} />
-          </View>
+        {/* Métricas do treino */}
+        <View style={styles.metricsRow}>
+          <MetricBox icon="event-repeat" value={String(sessions.length)} label="dias/sem" color={brand.blueGlow} />
+          <MetricBox icon="timer" value={sessions[0]?.duration.replace(" min", "") || "50"} label="min/sessão" color={brand.neonLime} />
+          <MetricBox icon="fitness-center" value={String(sessions.reduce((sum, session) => sum + session.exercises.length, 0))} label="exercícios" color={brand.violet} />
+          <MetricBox icon="insights" value="ALTA" label="intensidade" color={brand.success} />
+        </View>
 
-          {/* Progresso Geral */}
-          <View style={styles.overallProgressCard}>
-            <View style={styles.overallHeader}>
-              <Text style={styles.overallTitle}>PROGRESSO DA SESSÃO</Text>
-              <Text style={styles.overallRatio}>{progress.done} de {progress.total} concluídos</Text>
-            </View>
-            <View style={styles.trackBar}>
-              <View style={[styles.fillBar, { width: `${progress.ratio * 100}%` }]} />
-            </View>
+        {/* Progresso Geral */}
+        <View style={styles.overallProgressCard}>
+          <View style={styles.overallHeader}>
+            <Text style={styles.overallTitle}>PROGRESSO DA SESSÃO</Text>
+            <Text style={styles.overallRatio}>{progress.done} de {progress.total} concluídos</Text>
           </View>
+          <View style={styles.trackBar}>
+            <View style={[styles.fillBar, { width: `${progress.ratio * 100}%` }]} />
+          </View>
+        </View>
 
-          {/* Listagem de Sessões */}
-          {sessions.map((session, index) => (
-            <SessionCard key={session.id} session={session} defaultExpanded={index === 0} onToggle={toggle} />
-          ))}
-        </ScrollView>
+        {/* Listagem de Sessões */}
+        {sessions.map((session, index) => (
+          <SessionCard key={session.id} session={session} defaultExpanded={index === 0} onToggle={toggle} />
+        ))}
 
         <PrimaryButton
           label={progress.done === progress.total ? "Concluir Sessão de Treino" : "Iniciar Treino Atual"}
@@ -155,7 +153,7 @@ export default function WorkoutDetailScreen() {
           icon={<MaterialIcons name={progress.done === progress.total ? "check-circle" : "play-arrow"} color={brand.text} size={20} />}
           style={styles.startBtn}
         />
-      </View>
+      </ScrollView>
     </ScreenContainer>
   );
 }
@@ -226,7 +224,7 @@ function SessionCard({ session, defaultExpanded, onToggle }: { session: Session;
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
+  scrollView: { flex: 1, minHeight: 0, overflow: "scroll" },
   center: { alignItems: "center", flex: 1, gap: 12, justifyContent: "center", padding: 24 },
   message: { color: brand.muted, fontSize: 14, textAlign: "center" },
   menuBtn: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },

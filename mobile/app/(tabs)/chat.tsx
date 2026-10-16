@@ -121,6 +121,7 @@ export default function ChatScreen() {
         {/* ── Messages Container ─────────────────────────────────────── */}
         <ScrollView
           ref={scrollRef}
+          style={styles.messagesScroll}
           contentContainerStyle={styles.messages}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           showsVerticalScrollIndicator={false}
@@ -216,6 +217,7 @@ function PlanRow({ day, label }: { day: string; label: string }) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  messagesScroll: { flex: 1, minHeight: 0, overflow: "scroll" },
   header: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 60 },
   headerCopy: { flex: 1 },
   title: { color: brand.text, fontSize: 19, fontWeight: "900" },

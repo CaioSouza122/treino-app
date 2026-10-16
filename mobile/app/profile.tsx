@@ -97,6 +97,7 @@ export default function ProfileScreen() {
           </View>
 
           <ScrollView
+            style={styles.scrollView}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
           >
@@ -277,6 +278,7 @@ const styles = StyleSheet.create({
   },
   drawerTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 10 },
   closeBtn: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },
+  scrollView: { flex: 1, minHeight: 0, overflow: "scroll" },
   content: { gap: 14, padding: 18 },
   profileHeader: { alignItems: "center", marginVertical: 6 },
   avatarRing: {
