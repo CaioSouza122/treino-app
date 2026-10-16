@@ -9,6 +9,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { ScreenHeader } from "@/components/screen-header";
 import { brand, fonts, plateFor } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
+import { getTodayProgress, saveTodayProgress, type SessionProgress } from "@/lib/progress";
 import { parseSession, type Session } from "@/lib/workout-format";
 import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
 
@@ -34,11 +35,20 @@ export default function WorkoutDetailScreen() {
           (local?.id === params.workoutId ? local : null) ??
           history[0] ??
           local;
+        const saved: SessionProgress = found ? await getTodayProgress(found.id).catch(() => ({})) : {};
         if (!active) return;
         if (!found) setError("Nenhum treino encontrado. Crie seu primeiro plano com o Coach.");
         else {
           setWorkout(found);
-          setSessions(found.days.map(parseSession));
+          setSessions(
+            found.days.map(parseSession).map((item) => ({
+              ...item,
+              exercises: item.exercises.map((exercise) => ({
+                ...exercise,
+                completed: saved[item.id]?.includes(exercise.id) ?? false,
+              })),
+            })),
+          );
           setSelected((current) => Math.min(current, found.days.length - 1));
         }
       } catch (cause) {
@@ -52,6 +62,15 @@ export default function WorkoutDetailScreen() {
       active = false;
     };
   }, [params.workoutId]);
+
+  // Persist checks so leaving the screen (or closing the app) doesn't lose today's progress.
+  useEffect(() => {
+    if (!workout || loading) return;
+    const done = Object.fromEntries(
+      sessions.map((item) => [item.id, item.exercises.filter((exercise) => exercise.completed).map((exercise) => exercise.id)]),
+    );
+    saveTodayProgress(workout.id, done).catch(() => {});
+  }, [sessions, workout, loading]);
 
   const session = sessions[selected];
   const plate = plateFor(selected);

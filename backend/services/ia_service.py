@@ -17,7 +17,7 @@ _cache = {}
 _cache_tempo = {}
 
 
-def gerar_treino_ia(dados):
+async def gerar_treino_ia(dados):
     """
     Gera treino personalizado chamando a API no Render (que usa o Gemini internamente).
     Faz fallback local caso a API esteja inacessível.
@@ -29,7 +29,7 @@ def gerar_treino_ia(dados):
             print("[CACHE] Usando resposta do cache")
             return _cache[chave]
 
-        resposta = _chamar_api_externa_sync(dados)
+        resposta = await _chamar_api_externa(dados)
 
         if resposta:
             _cache[chave] = resposta
@@ -175,26 +175,39 @@ def _gerar_treino_local(dados) -> list:
     return resultado
 
 
-def _chamar_api_externa_sync(dados):
+def montar_payload_ia(dados) -> dict:
     """
-    Chama o endpoint POST /api/v1/treino da API no Render de forma síncrona.
+    Monta o corpo enviado à API de IA com o perfil completo do usuário,
+    para que o treino considere corpo, frequência e tempo disponível.
+    """
+    return {
+        "objetivo": dados.objetivo,
+        "nivel": dados.nivel or "intermediario",
+        "altura": dados.altura,
+        "peso": dados.peso,
+        "idade": dados.idade,
+        "vezes_por_semana": dados.vezes_por_semana,
+        "tempo": dados.tempo,
+    }
+
+
+async def _chamar_api_externa(dados):
+    """
+    Chama o endpoint POST /api/v1/treino da API no Render sem bloquear o event loop.
     """
     headers = {"Content-Type": "application/json"}
     chave_api = TREINO_API_KEY
     if chave_api:
         headers["X-API-KEY"] = chave_api
 
-    payload = {
-        "objetivo": dados.objetivo,
-        "nivel": dados.nivel or "intermediario",
-    }
+    payload = montar_payload_ia(dados)
 
     url = f"{TREINO_API_URL}/treino"
     print(f"[INFO] Chamando API Render: {url}")
 
     try:
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(url, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
 
         print(f"[INFO] Status da API Externa: {response.status_code}")
 

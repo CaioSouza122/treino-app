@@ -34,7 +34,7 @@ async def gerar_treino(
     """
     # 1. Gera o treino via IA ou fallback local
     try:
-        resultado = gerar_treino_ia(dados)
+        resultado = await gerar_treino_ia(dados)
         if not resultado:
             raise HTTPException(status_code=500, detail="Não foi possível gerar o treino")
     except Exception as e:
