@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
 import { ScreenHeader } from "@/components/screen-header";
-import { brand } from "@/constants/brand";
+import { brand, fonts } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
 
@@ -58,7 +58,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5">
+    <ScreenContainer edges={["top", "bottom", "left", "right"]}>
       <ScreenHeader title="Perfil" />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -67,6 +67,7 @@ export default function ProfileScreen() {
             <Text style={styles.avatarText}>{(profile.name || "A").slice(0, 1).toUpperCase()}</Text>
           </View>
           <Text style={styles.name}>{profile.name || "Atleta"}</Text>
+          <Text style={styles.nameSub}>Esses dados ajudam o Coach a ajustar volume e carga.</Text>
         </View>
 
         <Section title="Dados pessoais">
@@ -218,46 +219,55 @@ function ListItem({
 
 const styles = StyleSheet.create({
   scrollView: { flex: 1, minHeight: 0, overflow: "scroll" },
-  content: { gap: 28, paddingBottom: 32, paddingTop: 8 },
-  identity: { alignItems: "center", gap: 12 },
+  content: { gap: 32, paddingBottom: 32, paddingTop: 8 },
+  identity: { alignItems: "flex-start" },
   avatar: {
     alignItems: "center",
-    backgroundColor: brand.surfaceElevated,
+    borderColor: brand.borderStrong,
     borderRadius: 36,
+    borderWidth: 1.5,
     height: 72,
     justifyContent: "center",
     width: 72,
   },
-  avatarText: { color: brand.text, fontSize: 28, fontWeight: "600" },
-  name: { color: brand.text, fontSize: 20, fontWeight: "700" },
-  section: { gap: 14 },
-  sectionTitle: { color: brand.text, fontSize: 17, fontWeight: "600" },
+  avatarText: { color: brand.text, fontFamily: fonts.display, fontSize: 34 },
+  name: { color: brand.text, fontFamily: fonts.display, fontSize: 36, lineHeight: 40, marginTop: 16 },
+  nameSub: { color: brand.muted, fontFamily: fonts.body, fontSize: 15, lineHeight: 22, marginTop: 4 },
+  section: { gap: 16 },
+  sectionTitle: { color: brand.text, fontFamily: fonts.display, fontSize: 24 },
   row: { flexDirection: "row", gap: 10 },
   field: { flex: 1, gap: 6 },
-  label: { color: brand.muted, fontSize: 13 },
+  label: { color: brand.muted, fontFamily: fonts.medium, fontSize: 14 },
   inputWrap: {
     alignItems: "center",
     backgroundColor: brand.surface,
     borderColor: brand.border,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: 10,
+    borderWidth: 1.5,
     flexDirection: "row",
-    minHeight: 48,
+    minHeight: 50,
     paddingHorizontal: 14,
   },
-  input: { color: brand.text, flex: 1, fontSize: 15, minWidth: 0, paddingVertical: 10 },
-  suffix: { color: brand.dim, fontSize: 13, marginLeft: 4 },
-  segmented: { backgroundColor: brand.surface, borderRadius: 12, flexDirection: "row", gap: 4, padding: 4 },
-  segment: { alignItems: "center", borderRadius: 9, flex: 1, justifyContent: "center", minHeight: 38 },
-  segmentActive: { backgroundColor: brand.surfaceElevated },
-  segmentText: { color: brand.muted, fontSize: 13, fontWeight: "500" },
-  segmentTextActive: { color: brand.text, fontWeight: "600" },
-  list: { backgroundColor: brand.surface, borderRadius: 16, overflow: "hidden" },
-  listItem: { alignItems: "center", flexDirection: "row", gap: 14, minHeight: 54, paddingHorizontal: 16 },
-  listBorder: { borderBottomColor: brand.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  listPressed: { backgroundColor: brand.surfaceElevated },
-  listText: { color: brand.text, flex: 1, fontSize: 15 },
-  logout: { alignItems: "center", minHeight: 44, justifyContent: "center" },
-  logoutText: { color: brand.danger, fontSize: 15, fontWeight: "500" },
+  input: { color: brand.text, flex: 1, fontFamily: fonts.medium, fontSize: 17, minWidth: 0, paddingVertical: 10 },
+  suffix: { color: brand.muted, fontFamily: fonts.body, fontSize: 14, marginLeft: 4 },
+  segmented: { borderColor: brand.border, borderRadius: 10, borderWidth: 1.5, flexDirection: "row", padding: 3 },
+  segment: { alignItems: "center", borderRadius: 7, flex: 1, justifyContent: "center", minHeight: 40 },
+  segmentActive: { backgroundColor: brand.accent },
+  segmentText: { color: brand.muted, fontFamily: fonts.medium, fontSize: 14 },
+  segmentTextActive: { color: brand.background, fontFamily: fonts.semibold },
+  list: {},
+  listItem: {
+    alignItems: "center",
+    borderBottomColor: brand.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 14,
+    minHeight: 56,
+  },
+  listBorder: {},
+  listPressed: { opacity: 0.7 },
+  listText: { color: brand.text, flex: 1, fontFamily: fonts.medium, fontSize: 16 },
+  logout: { alignItems: "flex-start", justifyContent: "center", minHeight: 44 },
+  logoutText: { color: brand.danger, fontFamily: fonts.semibold, fontSize: 16 },
   pressed: { opacity: 0.7 },
 });

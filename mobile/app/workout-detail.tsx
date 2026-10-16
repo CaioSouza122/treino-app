@@ -3,12 +3,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { PrimaryButton } from "@/components/primary-button";
+import { Plate } from "@/components/plate";
+import { buttonInk, PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
 import { ScreenHeader } from "@/components/screen-header";
-import { brand } from "@/constants/brand";
+import { brand, fonts, plateFor } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
-import { parseSession, sessionLetter, type Session } from "@/lib/workout-format";
+import { parseSession, type Session } from "@/lib/workout-format";
 import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
 
 const userId = process.env.EXPO_PUBLIC_TREINO_USER_ID || "mobile-demo-user";
@@ -53,6 +54,7 @@ export default function WorkoutDetailScreen() {
   }, [params.workoutId]);
 
   const session = sessions[selected];
+  const plate = plateFor(selected);
   const progress = useMemo(() => {
     const exercises = session?.exercises ?? [];
     const done = exercises.filter((exercise) => exercise.completed).length;
@@ -78,7 +80,7 @@ export default function WorkoutDetailScreen() {
 
   if (loading || error || !workout || !session) {
     return (
-      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5">
+      <ScreenContainer edges={["top", "bottom", "left", "right"]}>
         <ScreenHeader title="Treino" />
         <View style={styles.center}>
           {loading ? (
@@ -95,28 +97,29 @@ export default function WorkoutDetailScreen() {
   }
 
   return (
-    <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5">
-      <ScreenHeader title="Treino" subtitle={`Criado em ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`} />
+    <ScreenContainer edges={["top", "bottom", "left", "right"]}>
+      <ScreenHeader title="Treino da semana" />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {sessions.length > 1 && (
-          <View style={styles.segmented}>
-            {sessions.map((item, index) => (
-              <Pressable
-                key={item.id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: index === selected }}
-                onPress={() => {
-                  haptic.light();
-                  setSelected(index);
-                }}
-                style={[styles.segment, index === selected && styles.segmentActive]}
-              >
-                <Text style={[styles.segmentText, index === selected && styles.segmentTextActive]}>
-                  {sessionLetter(index)}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={styles.plates} accessibilityRole="tablist">
+            {sessions.map((item, index) => {
+              const active = index === selected;
+              return (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => {
+                    haptic.light();
+                    setSelected(index);
+                  }}
+                  style={[styles.plateTab, active && { borderColor: plateFor(index).color }]}
+                >
+                  <Plate index={index} size={44} muted={!active} />
+                </Pressable>
+              );
+            })}
           </View>
         )}
 
@@ -124,38 +127,36 @@ export default function WorkoutDetailScreen() {
           <Text style={styles.dayLabel}>{session.label}</Text>
           <Text style={styles.title}>{session.subtitle}</Text>
           <Text style={styles.summary}>
-            {session.exercises.length} exercícios · {session.minutes} min
+            {session.exercises.length} exercícios, cerca de {session.minutes} minutos
           </Text>
         </View>
 
         <View style={styles.progressBlock}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Progresso</Text>
-            <Text style={styles.progressValue}>
-              {progress.done}/{progress.total}
-            </Text>
-          </View>
           <View style={styles.track}>
-            <View style={[styles.trackFill, { width: `${progress.ratio * 100}%` }]} />
+            <View style={[styles.trackFill, { backgroundColor: plate.color, width: `${progress.ratio * 100}%` }]} />
           </View>
+          <Text style={styles.progressText}>
+            {finished ? "Tudo feito. Bom treino!" : `${progress.done} de ${progress.total} feitos`}
+          </Text>
         </View>
 
-        <View style={styles.list}>
+        <View>
           {session.exercises.map((exercise, index) => (
             <Pressable
               key={exercise.id}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: exercise.completed }}
               onPress={() => toggle(exercise.id)}
-              style={({ pressed }) => [
-                styles.exercise,
-                index < session.exercises.length - 1 && styles.exerciseBorder,
-                pressed && styles.exercisePressed,
-              ]}
+              style={({ pressed }) => [styles.exercise, pressed && styles.pressed]}
             >
-              <View style={[styles.check, exercise.completed && styles.checkDone]}>
+              <View
+                style={[
+                  styles.check,
+                  exercise.completed && { backgroundColor: plate.color, borderColor: plate.color },
+                ]}
+              >
                 {exercise.completed ? (
-                  <MaterialIcons name="check" color="#FFFFFF" size={16} />
+                  <MaterialIcons name="check" color={plate.ink} size={18} />
                 ) : (
                   <Text style={styles.checkIndex}>{index + 1}</Text>
                 )}
@@ -164,8 +165,10 @@ export default function WorkoutDetailScreen() {
                 <Text style={[styles.exerciseName, exercise.completed && styles.exerciseNameDone]}>
                   {exercise.name}
                 </Text>
-                <Text style={styles.prescription}>{exercise.prescription}</Text>
               </View>
+              <Text style={[styles.prescription, exercise.completed && styles.exerciseNameDone]}>
+                {exercise.prescription}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -179,7 +182,7 @@ export default function WorkoutDetailScreen() {
           icon={
             <MaterialIcons
               name={finished ? "check" : "play-arrow"}
-              color={finished ? "#FFFFFF" : brand.text}
+              color={finished ? buttonInk.primary : buttonInk.secondary}
               size={20}
             />
           }
@@ -191,41 +194,41 @@ export default function WorkoutDetailScreen() {
 
 const styles = StyleSheet.create({
   scrollView: { flex: 1, minHeight: 0, overflow: "scroll" },
-  content: { gap: 24, paddingBottom: 24, paddingTop: 12 },
+  content: { gap: 28, paddingBottom: 24, paddingTop: 12 },
   center: { alignItems: "center", flex: 1, gap: 20, justifyContent: "center", padding: 24 },
-  message: { color: brand.muted, fontSize: 15, textAlign: "center" },
-  segmented: { backgroundColor: brand.surface, borderRadius: 12, flexDirection: "row", gap: 4, padding: 4 },
-  segment: { alignItems: "center", borderRadius: 9, flex: 1, height: 36, justifyContent: "center" },
-  segmentActive: { backgroundColor: brand.surfaceElevated },
-  segmentText: { color: brand.dim, fontSize: 14, fontWeight: "600" },
-  segmentTextActive: { color: brand.text },
-  dayLabel: { color: brand.accentText, fontSize: 13, fontWeight: "600" },
-  title: { color: brand.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.5, marginTop: 4 },
-  summary: { color: brand.muted, fontSize: 14, marginTop: 6 },
+  message: { color: brand.muted, fontFamily: fonts.body, fontSize: 16, textAlign: "center" },
+  plates: { flexDirection: "row", gap: 10 },
+  plateTab: { borderColor: "transparent", borderRadius: 28, borderWidth: 2, padding: 4 },
+  dayLabel: { color: brand.muted, fontFamily: fonts.medium, fontSize: 15 },
+  title: { color: brand.text, fontFamily: fonts.display, fontSize: 40, lineHeight: 42, marginTop: 2 },
+  summary: { color: brand.muted, fontFamily: fonts.body, fontSize: 15, marginTop: 8 },
   progressBlock: { gap: 8 },
-  progressHeader: { flexDirection: "row", justifyContent: "space-between" },
-  progressLabel: { color: brand.muted, fontSize: 13 },
-  progressValue: { color: brand.text, fontSize: 13, fontWeight: "600" },
-  track: { backgroundColor: brand.surfaceElevated, borderRadius: 3, height: 6, overflow: "hidden" },
-  trackFill: { backgroundColor: brand.success, borderRadius: 3, height: "100%" },
-  list: { backgroundColor: brand.surface, borderRadius: 16, overflow: "hidden" },
-  exercise: { alignItems: "center", flexDirection: "row", gap: 14, minHeight: 68, paddingHorizontal: 16, paddingVertical: 12 },
-  exerciseBorder: { borderBottomColor: brand.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  exercisePressed: { backgroundColor: brand.surfaceElevated },
+  track: { backgroundColor: brand.surfaceElevated, borderRadius: 4, height: 8, overflow: "hidden" },
+  trackFill: { borderRadius: 4, height: "100%" },
+  progressText: { color: brand.muted, fontFamily: fonts.body, fontSize: 14 },
+  exercise: {
+    alignItems: "center",
+    borderBottomColor: brand.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 14,
+    minHeight: 64,
+    paddingVertical: 10,
+  },
+  pressed: { opacity: 0.7 },
   check: {
     alignItems: "center",
     borderColor: brand.borderStrong,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
-    height: 28,
+    height: 32,
     justifyContent: "center",
-    width: 28,
+    width: 32,
   },
-  checkDone: { backgroundColor: brand.success, borderColor: brand.success },
-  checkIndex: { color: brand.muted, fontSize: 12, fontWeight: "600" },
+  checkIndex: { color: brand.muted, fontFamily: fonts.display, fontSize: 16 },
   exerciseText: { flex: 1 },
-  exerciseName: { color: brand.text, fontSize: 15, fontWeight: "500" },
+  exerciseName: { color: brand.text, fontFamily: fonts.medium, fontSize: 16 },
   exerciseNameDone: { color: brand.dim, textDecorationLine: "line-through" },
-  prescription: { color: brand.muted, fontSize: 13, marginTop: 3 },
+  prescription: { color: brand.text, fontFamily: fonts.display, fontSize: 20 },
   footer: { borderTopColor: brand.border, borderTopWidth: StyleSheet.hairlineWidth, paddingBottom: 8, paddingTop: 12 },
 });

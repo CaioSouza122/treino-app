@@ -12,9 +12,11 @@ import {
   View,
 } from "react-native";
 
-import { PrimaryButton } from "@/components/primary-button";
+import { BrandMark } from "@/components/brand-mark";
+import { Plate } from "@/components/plate";
+import { buttonInk, PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
-import { brand } from "@/constants/brand";
+import { brand, fonts } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { getProfile } from "@/lib/profile";
 import { generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
@@ -82,12 +84,10 @@ export default function ChatScreen() {
     <ScreenContainer edges={["top", "left", "right"]} className="px-5">
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.fill}>
         <View style={styles.header}>
-          <View style={styles.coachAvatar}>
-            <MaterialIcons name="bolt" size={20} color="#FFFFFF" />
-          </View>
+          <BrandMark size={38} />
           <View style={styles.headerCopy}>
             <Text style={styles.title}>Coach</Text>
-            <Text style={styles.subtitle}>Monta e ajusta seu treino</Text>
+            <Text style={styles.subtitle}>Monta e ajusta seu plano</Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -112,19 +112,19 @@ export default function ChatScreen() {
 
           <View style={styles.planCard}>
             <Text style={styles.planLabel}>Plano sugerido</Text>
-            <Text style={styles.planTitle}>Hipertrofia · 4 dias</Text>
+            <Text style={styles.planTitle}>Hipertrofia em 4 dias</Text>
             <View style={styles.planRows}>
-              <PlanRow day="A" label="Peito, tríceps e ombro" />
-              <PlanRow day="B" label="Costas e bíceps" />
-              <PlanRow day="C" label="Pernas e panturrilha" />
-              <PlanRow day="D" label="Ombros e core" />
+              <PlanRow index={0} label="Peito, tríceps e ombro" />
+              <PlanRow index={1} label="Costas e bíceps" />
+              <PlanRow index={2} label="Pernas e panturrilha" />
+              <PlanRow index={3} label="Ombros e core" />
             </View>
             {error && <Text style={styles.error}>{error}</Text>}
             <PrimaryButton
               label={generating ? "Gerando treino…" : "Gerar treino"}
               onPress={generate}
               disabled={generating}
-              icon={<MaterialIcons name="auto-awesome" size={18} color="#FFFFFF" />}
+              icon={<MaterialIcons name="auto-awesome" size={18} color={buttonInk.primary} />}
               style={styles.planButton}
             />
           </View>
@@ -164,7 +164,7 @@ export default function ChatScreen() {
             onPress={() => send()}
             style={({ pressed }) => [styles.sendBtn, !input.trim() && styles.sendDisabled, pressed && styles.pressed]}
           >
-            <MaterialIcons name="arrow-upward" color="#FFFFFF" size={20} />
+            <MaterialIcons name="arrow-upward" color={input.trim() ? brand.background : brand.muted} size={20} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -183,10 +183,10 @@ function MessageBubble({ message }: { message: Message }) {
   );
 }
 
-function PlanRow({ day, label }: { day: string; label: string }) {
+function PlanRow({ index, label }: { index: number; label: string }) {
   return (
     <View style={styles.planRow}>
-      <Text style={styles.dayText}>{day}</Text>
+      <Plate index={index} size={30} />
       <Text style={styles.planRowText}>{label}</Text>
     </View>
   );
@@ -205,50 +205,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  coachAvatar: {
-    alignItems: "center",
-    backgroundColor: brand.accent,
-    borderRadius: 20,
-    height: 40,
-    justifyContent: "center",
-    width: 40,
-  },
   headerCopy: { flex: 1 },
-  title: { color: brand.text, fontSize: 17, fontWeight: "600" },
-  subtitle: { color: brand.muted, fontSize: 13, marginTop: 1 },
+  title: { color: brand.text, fontFamily: fonts.display, fontSize: 26, lineHeight: 28 },
+  subtitle: { color: brand.muted, fontFamily: fonts.body, fontSize: 14 },
   iconBtn: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },
   messagesScroll: { flex: 1, minHeight: 0, overflow: "scroll" },
   messages: { gap: 10, paddingBottom: 16, paddingTop: 16 },
   messageRow: { flexDirection: "row" },
   messageRowUser: { justifyContent: "flex-end" },
-  bubble: { borderRadius: 18, maxWidth: "82%", paddingHorizontal: 14, paddingVertical: 10 },
-  coachBubble: { backgroundColor: brand.surface, borderBottomLeftRadius: 6 },
-  userBubble: { backgroundColor: brand.accent, borderBottomRightRadius: 6 },
-  bubbleText: { color: brand.text, fontSize: 15, lineHeight: 21 },
-  userText: { color: "#FFFFFF" },
-  planCard: { backgroundColor: brand.surface, borderRadius: 18, marginTop: 6, padding: 18 },
-  planLabel: { color: brand.accentText, fontSize: 13, fontWeight: "600" },
-  planTitle: { color: brand.text, fontSize: 18, fontWeight: "700", marginTop: 4 },
-  planRows: { gap: 12, marginTop: 16 },
+  bubble: { borderRadius: 16, maxWidth: "84%", paddingHorizontal: 14, paddingVertical: 10 },
+  coachBubble: { backgroundColor: brand.surface, borderTopLeftRadius: 4 },
+  userBubble: { backgroundColor: brand.accent, borderTopRightRadius: 4 },
+  bubbleText: { color: brand.text, fontFamily: fonts.body, fontSize: 16, lineHeight: 23 },
+  userText: { color: brand.background, fontFamily: fonts.medium },
+  planCard: { borderColor: brand.borderStrong, borderRadius: 18, borderWidth: 1.5, marginTop: 8, padding: 18 },
+  planLabel: { color: brand.muted, fontFamily: fonts.medium, fontSize: 14 },
+  planTitle: { color: brand.text, fontFamily: fonts.display, fontSize: 28, lineHeight: 30, marginTop: 2 },
+  planRows: { gap: 10, marginTop: 16 },
   planRow: { alignItems: "center", flexDirection: "row", gap: 12 },
-  dayText: { color: brand.muted, fontSize: 13, fontWeight: "600", width: 16 },
-  planRowText: { color: brand.text, fontSize: 15 },
+  planRowText: { color: brand.text, fontFamily: fonts.medium, fontSize: 16 },
   planButton: { marginTop: 20 },
-  error: { color: brand.danger, fontSize: 13, marginTop: 12 },
+  error: { color: brand.danger, fontFamily: fonts.body, fontSize: 14, marginTop: 12 },
   presetScroll: { flexGrow: 0, marginHorizontal: -20 },
   presetRow: { gap: 8, paddingHorizontal: 20, paddingVertical: 8 },
   presetChip: {
-    borderColor: brand.border,
+    borderColor: brand.borderStrong,
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  presetText: { color: brand.text, fontSize: 13 },
+  presetText: { color: brand.text, fontFamily: fonts.medium, fontSize: 14 },
   composer: {
     alignItems: "center",
     backgroundColor: brand.surface,
-    borderRadius: 24,
+    borderRadius: 26,
     flexDirection: "row",
     gap: 8,
     marginBottom: 10,
@@ -256,14 +247,14 @@ const styles = StyleSheet.create({
     paddingRight: 5,
     paddingVertical: 5,
   },
-  composerInput: { color: brand.text, flex: 1, fontSize: 15, minHeight: 40, paddingHorizontal: 12 },
+  composerInput: { color: brand.text, flex: 1, fontFamily: fonts.body, fontSize: 16, minHeight: 42, paddingHorizontal: 12 },
   sendBtn: {
     alignItems: "center",
     backgroundColor: brand.accent,
-    borderRadius: 19,
-    height: 38,
+    borderRadius: 21,
+    height: 42,
     justifyContent: "center",
-    width: 38,
+    width: 42,
   },
   sendDisabled: { backgroundColor: brand.surfaceElevated },
   pressed: { opacity: 0.7 },

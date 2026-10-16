@@ -15,7 +15,7 @@ import {
 import { BrandMark } from "@/components/brand-mark";
 import { PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
-import { brand } from "@/constants/brand";
+import { brand, fonts } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 
 export default function LoginScreen() {
@@ -29,13 +29,13 @@ export default function LoginScreen() {
   };
 
   return (
-    <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-6">
+    <ScreenContainer edges={["top", "bottom", "left", "right"]}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.fill}>
-        <ScrollView style={styles.fill} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView style={styles.fill} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.brand}>
-            <BrandMark size={56} />
-            <Text style={styles.title}>Entre na sua conta</Text>
-            <Text style={styles.subtitle}>Seu plano de treino personalizado, sempre com você.</Text>
+            <BrandMark size={48} withName />
+            <Text style={styles.title}>Bora treinar?</Text>
+            <Text style={styles.subtitle}>Entre para ver o treino de hoje e o plano que o Coach montou para você.</Text>
           </View>
 
           <View style={styles.form}>
@@ -72,7 +72,7 @@ export default function LoginScreen() {
               label="Continuar com Google"
               variant="secondary"
               onPress={handleLogin}
-              icon={<MaterialIcons name="g-translate" size={18} color={brand.text} />}
+              icon={<Text style={styles.googleG}>G</Text>}
             />
             <PrimaryButton
               label="Continuar com Apple"
@@ -127,33 +127,34 @@ function Input({
 const styles = StyleSheet.create({
   fill: { flex: 1, minHeight: 0 },
   content: { flexGrow: 1, justifyContent: "center", paddingVertical: 32 },
-  brand: { alignItems: "center", marginBottom: 36 },
-  title: { color: brand.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.5, marginTop: 24 },
-  subtitle: { color: brand.muted, fontSize: 15, lineHeight: 21, marginTop: 8, textAlign: "center" },
+  brand: { alignItems: "flex-start", marginBottom: 36 },
+  title: { color: brand.text, fontFamily: fonts.display, fontSize: 48, lineHeight: 50, marginTop: 36 },
+  subtitle: { color: brand.muted, fontFamily: fonts.body, fontSize: 16, lineHeight: 24, marginTop: 8 },
   form: { gap: 16 },
   field: { gap: 6 },
-  label: { color: brand.muted, fontSize: 13 },
+  label: { color: brand.muted, fontFamily: fonts.medium, fontSize: 14 },
   inputWrap: {
     alignItems: "center",
     backgroundColor: brand.surface,
     borderColor: brand.border,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: 10,
+    borderWidth: 1.5,
     flexDirection: "row",
     gap: 10,
-    height: 52,
+    height: 54,
     paddingHorizontal: 14,
   },
-  input: { color: brand.text, flex: 1, fontSize: 15, height: "100%", minWidth: 0 },
+  input: { color: brand.text, flex: 1, fontFamily: fonts.medium, fontSize: 16, height: "100%", minWidth: 0 },
   forgot: { alignSelf: "flex-end", marginTop: -4 },
-  link: { color: brand.accentText, fontSize: 14, fontWeight: "500" },
+  link: { color: brand.text, fontFamily: fonts.semibold, fontSize: 15, textDecorationLine: "underline" },
   dividerRow: { alignItems: "center", flexDirection: "row", gap: 12, marginVertical: 24 },
   dividerLine: { backgroundColor: brand.border, flex: 1, height: StyleSheet.hairlineWidth },
-  dividerText: { color: brand.dim, fontSize: 13 },
+  dividerText: { color: brand.muted, fontFamily: fonts.body, fontSize: 14 },
   social: { gap: 10 },
+  googleG: { color: brand.text, fontFamily: fonts.display, fontSize: 20 },
   signup: { flexDirection: "row", gap: 6, justifyContent: "center", marginTop: 28 },
-  signupText: { color: brand.muted, fontSize: 14 },
-  terms: { color: brand.dim, fontSize: 12, lineHeight: 18, marginTop: 20, textAlign: "center" },
+  signupText: { color: brand.muted, fontFamily: fonts.body, fontSize: 15 },
+  terms: { color: brand.dim, fontFamily: fonts.body, fontSize: 13, lineHeight: 19, marginTop: 20, textAlign: "center" },
   termLink: { color: brand.muted },
   pressed: { opacity: 0.6 },
 });

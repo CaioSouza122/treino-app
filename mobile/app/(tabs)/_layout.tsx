@@ -3,7 +3,7 @@ import { Tabs } from "expo-router";
 import { Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { brand } from "@/constants/brand";
+import { brand, fonts } from "@/constants/brand";
 
 const tabs = [
   { name: "index", title: "Início", icon: "home-filled" },
@@ -44,5 +44,5 @@ const styles = StyleSheet.create({
     borderTopColor: brand.border,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  label: { fontSize: 11, fontWeight: "500" },
+  label: { fontFamily: fonts.medium, fontSize: 12 },
 });

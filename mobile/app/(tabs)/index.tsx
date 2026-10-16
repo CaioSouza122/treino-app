@@ -3,12 +3,13 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { PrimaryButton } from "@/components/primary-button";
+import { Plate } from "@/components/plate";
+import { buttonInk, PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
-import { brand } from "@/constants/brand";
+import { brand, fonts } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { getProfile, type UserProfile } from "@/lib/profile";
-import { parseSession, sessionLetter } from "@/lib/workout-format";
+import { parseSession } from "@/lib/workout-format";
 import { getLastWorkout, type LocalWorkout } from "@/lib/workouts-api";
 
 export default function HomeScreen() {
@@ -50,7 +51,7 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <ScreenContainer className="px-5">
+      <ScreenContainer>
         <View style={styles.loading}>
           <Text style={styles.muted}>Carregando…</Text>
         </View>
@@ -59,7 +60,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScreenContainer className="px-5">
+    <ScreenContainer padded={false}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.headerText}>
@@ -81,51 +82,41 @@ export default function HomeScreen() {
 
         {workout && todaySession ? (
           <>
-            <View style={styles.todayCard}>
-              <Text style={styles.todayLabel}>Treino de hoje</Text>
-              <Text style={styles.todayTitle}>{todaySession.subtitle}</Text>
-              <View style={styles.metaRow}>
-                <Meta icon="format-list-bulleted" text={`${todaySession.exercises.length} exercícios`} />
-                <Meta icon="schedule" text={`${todaySession.minutes} min`} />
+            <View>
+              <View style={styles.hero}>
+                <View style={styles.heroText}>
+                  <Text style={styles.heroLead}>Hoje é dia de</Text>
+                  <Text style={styles.heroTitle}>{todaySession.subtitle}</Text>
+                  <Text style={styles.heroMeta}>
+                    {todaySession.exercises.length} exercícios{"\n"}cerca de {todaySession.minutes} minutos
+                  </Text>
+                </View>
+                <Plate index={todayIndex} size={190} caption={`${todaySession.minutes} MIN`} style={styles.heroPlate} />
               </View>
               <PrimaryButton
                 label="Começar treino"
                 onPress={() => openWorkout(todayIndex)}
-                icon={<MaterialIcons name="play-arrow" size={20} color="#FFFFFF" />}
-                style={styles.todayButton}
+                icon={<MaterialIcons name="play-arrow" size={22} color={buttonInk.primary} />}
               />
             </View>
 
             <View>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Sua semana</Text>
-                <Text style={styles.muted}>{workout.days.length} treinos</Text>
-              </View>
-              <View style={styles.list}>
-                {workout.days.map((day, index) => (
-                  <Pressable
-                    key={`${day.dia}-${index}`}
-                    accessibilityRole="button"
-                    onPress={() => openWorkout(index)}
-                    style={({ pressed }) => [
-                      styles.row,
-                      index < workout.days.length - 1 && styles.rowBorder,
-                      pressed && styles.rowPressed,
-                    ]}
-                  >
-                    <View style={[styles.letter, index === todayIndex && styles.letterActive]}>
-                      <Text style={[styles.letterText, index === todayIndex && styles.letterTextActive]}>
-                        {sessionLetter(index)}
-                      </Text>
-                    </View>
-                    <View style={styles.rowText}>
-                      <Text style={styles.rowTitle} numberOfLines={1}>{day.foco || "Sessão de treino"}</Text>
-                      <Text style={styles.rowSub}>{day.dia}</Text>
-                    </View>
-                    <MaterialIcons name="chevron-right" size={20} color={brand.dim} />
-                  </Pressable>
-                ))}
-              </View>
+              <Text style={styles.sectionTitle}>Sua semana</Text>
+              {workout.days.map((day, index) => (
+                <Pressable
+                  key={`${day.dia}-${index}`}
+                  accessibilityRole="button"
+                  onPress={() => openWorkout(index)}
+                  style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                >
+                  <Plate index={index} size={44} />
+                  <View style={styles.rowText}>
+                    <Text style={styles.rowTitle} numberOfLines={1}>{day.foco || "Sessão de treino"}</Text>
+                    <Text style={styles.rowSub}>{index === todayIndex ? `${day.dia}, hoje` : day.dia}</Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={22} color={brand.dim} />
+                </Pressable>
+              ))}
             </View>
 
             <Pressable
@@ -133,27 +124,20 @@ export default function HomeScreen() {
               onPress={() => router.push("/(tabs)/chat" as never)}
               style={({ pressed }) => [styles.coachLink, pressed && styles.pressed]}
             >
-              <View style={styles.coachIcon}>
-                <MaterialIcons name="auto-awesome" size={18} color={brand.accentText} />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>Ajustar meu plano</Text>
-                <Text style={styles.rowSub}>Converse com o Coach para mudar exercícios ou dias</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={20} color={brand.dim} />
+              <Text style={styles.coachText}>
+                Quer trocar um exercício ou mudar os dias? <Text style={styles.coachAction}>Fale com o Coach</Text>
+              </Text>
             </Pressable>
           </>
         ) : (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <MaterialIcons name="auto-awesome" size={26} color={brand.accentText} />
-            </View>
-            <Text style={styles.emptyTitle}>Monte seu primeiro treino</Text>
+            <Plate index={0} size={120} muted />
+            <Text style={styles.emptyTitle}>Sua barra está vazia</Text>
             <Text style={styles.emptyDescription}>
-              Responda algumas perguntas e o Coach cria um plano de hipertrofia sob medida para você.
+              Conte ao Coach seu objetivo e quantos dias você treina. Ele monta um plano de hipertrofia sob medida.
             </Text>
             <PrimaryButton
-              label="Criar meu plano"
+              label="Montar meu plano"
               onPress={() => router.push("/(tabs)/chat" as never)}
               style={styles.emptyButton}
             />
@@ -164,87 +148,50 @@ export default function HomeScreen() {
   );
 }
 
-function Meta({ icon, text }: { icon: keyof typeof MaterialIcons.glyphMap; text: string }) {
-  return (
-    <View style={styles.meta}>
-      <MaterialIcons name={icon} size={15} color={brand.muted} />
-      <Text style={styles.metaText}>{text}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   scrollView: { flex: 1, minHeight: 0, overflow: "scroll" },
-  content: { gap: 28, paddingBottom: 32, paddingTop: 16 },
+  content: { gap: 36, paddingBottom: 32, paddingHorizontal: 20, paddingTop: 16 },
   loading: { alignItems: "center", flex: 1, justifyContent: "center" },
-  muted: { color: brand.muted, fontSize: 13 },
-  header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  muted: { color: brand.muted, fontFamily: fonts.body, fontSize: 14 },
+  header: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between" },
   headerText: { flex: 1 },
-  date: { color: brand.muted, fontSize: 13 },
-  greeting: { color: brand.text, fontSize: 28, fontWeight: "700", letterSpacing: -0.6, marginTop: 4 },
+  date: { color: brand.muted, fontFamily: fonts.body, fontSize: 14 },
+  greeting: { color: brand.text, fontFamily: fonts.display, fontSize: 40, lineHeight: 44, marginTop: 2 },
   avatar: {
     alignItems: "center",
-    backgroundColor: brand.surfaceElevated,
-    borderRadius: 20,
-    height: 40,
+    borderColor: brand.borderStrong,
+    borderRadius: 21,
+    borderWidth: 1.5,
+    height: 42,
     justifyContent: "center",
-    width: 40,
+    width: 42,
   },
-  avatarText: { color: brand.text, fontSize: 15, fontWeight: "600" },
-  todayCard: { backgroundColor: brand.surface, borderRadius: 20, padding: 20 },
-  todayLabel: { color: brand.accentText, fontSize: 13, fontWeight: "600" },
-  todayTitle: { color: brand.text, fontSize: 22, fontWeight: "700", letterSpacing: -0.4, marginTop: 6 },
-  metaRow: { flexDirection: "row", gap: 16, marginTop: 10 },
-  meta: { alignItems: "center", flexDirection: "row", gap: 5 },
-  metaText: { color: brand.muted, fontSize: 13 },
-  todayButton: { marginTop: 20 },
-  sectionHeader: { alignItems: "baseline", flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  sectionTitle: { color: brand.text, fontSize: 17, fontWeight: "600" },
-  list: { backgroundColor: brand.surface, borderRadius: 16, overflow: "hidden" },
-  row: { alignItems: "center", flexDirection: "row", gap: 14, minHeight: 64, paddingHorizontal: 16 },
-  rowBorder: { borderBottomColor: brand.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  rowPressed: { backgroundColor: brand.surfaceElevated },
-  rowText: { flex: 1 },
-  rowTitle: { color: brand.text, fontSize: 15, fontWeight: "500" },
-  rowSub: { color: brand.muted, fontSize: 13, marginTop: 2 },
-  letter: {
+  avatarText: { color: brand.text, fontFamily: fonts.display, fontSize: 20 },
+  // The plate bleeds past the right edge of the screen on purpose.
+  hero: { alignItems: "center", flexDirection: "row", marginBottom: 24, marginRight: -20, overflow: "hidden" },
+  heroPlate: { marginRight: -48 },
+  heroText: { flex: 1, paddingRight: 12 },
+  heroLead: { color: brand.muted, fontFamily: fonts.medium, fontSize: 15 },
+  heroTitle: { color: brand.text, fontFamily: fonts.display, fontSize: 38, lineHeight: 40, marginTop: 4 },
+  heroMeta: { color: brand.muted, fontFamily: fonts.body, fontSize: 14, lineHeight: 20, marginTop: 12 },
+  sectionTitle: { color: brand.text, fontFamily: fonts.display, fontSize: 26, marginBottom: 6 },
+  row: {
     alignItems: "center",
-    backgroundColor: brand.surfaceElevated,
-    borderRadius: 10,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  letterActive: { backgroundColor: brand.accent },
-  letterText: { color: brand.muted, fontSize: 14, fontWeight: "600" },
-  letterTextActive: { color: "#FFFFFF" },
-  coachLink: {
-    alignItems: "center",
-    backgroundColor: brand.surface,
-    borderRadius: 16,
+    borderBottomColor: brand.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 14,
-    padding: 16,
+    minHeight: 72,
   },
-  coachIcon: {
-    alignItems: "center",
-    backgroundColor: brand.accentSoft,
-    borderRadius: 10,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  emptyState: { alignItems: "center", paddingHorizontal: 8, paddingTop: 72 },
-  emptyIcon: {
-    alignItems: "center",
-    backgroundColor: brand.accentSoft,
-    borderRadius: 18,
-    height: 56,
-    justifyContent: "center",
-    width: 56,
-  },
-  emptyTitle: { color: brand.text, fontSize: 22, fontWeight: "700", marginTop: 20, textAlign: "center" },
-  emptyDescription: { color: brand.muted, fontSize: 15, lineHeight: 22, marginTop: 8, textAlign: "center" },
+  rowText: { flex: 1 },
+  rowTitle: { color: brand.text, fontFamily: fonts.semibold, fontSize: 16 },
+  rowSub: { color: brand.muted, fontFamily: fonts.body, fontSize: 14, marginTop: 2 },
+  coachLink: { paddingVertical: 4 },
+  coachText: { color: brand.muted, fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
+  coachAction: { color: brand.text, fontFamily: fonts.semibold, textDecorationLine: "underline" },
+  emptyState: { alignItems: "flex-start", paddingTop: 48 },
+  emptyTitle: { color: brand.text, fontFamily: fonts.display, fontSize: 36, lineHeight: 40, marginTop: 28 },
+  emptyDescription: { color: brand.muted, fontFamily: fonts.body, fontSize: 16, lineHeight: 24, marginTop: 10 },
   emptyButton: { alignSelf: "stretch", marginTop: 28 },
   pressed: { opacity: 0.7 },
 });
