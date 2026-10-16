@@ -9,6 +9,20 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Adicionado
+- 🏋️ Nova identidade visual "Anilha": cada dia do plano tem a cor de uma anilha olímpica, com fontes Big Shoulders Display e Barlow
+- ✅ Progresso dos exercícios salvo no aparelho durante o dia (sobrevive a sair da tela ou fechar o app)
+- 🧪 Testes do backend para o envio do perfil completo à IA, sem chamar a API real
+
+### Alterado
+- 🤖 O backend envia o perfil completo à API de IA (altura, peso, idade, frequência e tempo), não só objetivo e nível
+- ⚡ A chamada à API de IA passou a ser assíncrona e não bloqueia mais o servidor durante a geração
+- 📱 Telas redesenhadas: início com treino do dia, treino com seletor por anilha, perfil como tela própria
+- 📱 Rolagem corrigida no app web
+
+### Removido
+- Menções a exportação para Excel e URL da API configurável dentro do app, que não existem no código atual
+
 ### Em desenvolvimento
 - Autenticação de usuários com JWT
 - Notificações push de lembrete de treino

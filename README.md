@@ -20,7 +20,9 @@
 
 ## 📖 Sobre o Projeto
 
-O **HIPERTROF.IA** é um aplicativo mobile **Full-Stack** que utiliza o **Google Gemini** para gerar protocolos de treino hiperpersonalizados. O usuário informa seus dados físicos (idade, peso, altura, objetivo, frequência semanal e tempo disponível) e a IA monta um plano de treino dividido (A, B, C...) adaptado à sua rotina.
+O **HIPERTROF.IA** é um aplicativo mobile **Full-Stack** que utiliza o **Google Gemini** para gerar protocolos de treino hiperpersonalizados. O usuário informa seus dados físicos (idade, peso, altura, objetivo, frequência semanal e tempo disponível) e a IA monta um plano de treino dividido (A, B, C...) adaptado à sua rotina. O perfil completo é enviado à IA a cada geração.
+
+No app, cada dia do plano tem a cor de uma anilha olímpica (A vermelha, B azul, C amarela, D verde). O treino de hoje aparece em destaque na tela inicial, e o usuário marca os exercícios conforme avança.
 
 Quando a API de IA está indisponível, o sistema automaticamente usa um **fallback local** inteligente baseado em templates estruturados — garantindo que o usuário sempre receba um treino.
 
@@ -30,13 +32,17 @@ Quando a API de IA está indisponível, o sistema automaticamente usa um **fallb
 
 | Funcionalidade | Status |
 |---|---|
-| 🤖 Geração de treino via IA (Google Gemini) | ✅ Disponível |
+| 🤖 Geração de treino via IA (Google Gemini) com o perfil completo | ✅ Disponível |
 | 🔄 Fallback automático (treino local offline) | ✅ Disponível |
+| 🏋️ Treino do dia em destaque e plano semanal por cores de anilha | ✅ Disponível |
+| ✅ Checklist de exercícios com progresso salvo no dia | ✅ Disponível |
 | 💾 Persistência de perfil (AsyncStorage) | ✅ Disponível |
 | ☁️ Histórico de treinos (PostgreSQL / Neon) | ✅ Disponível |
-| 📥 Exportação para Excel (.xlsx) | ✅ Disponível |
-| ⚙️ URL da API configurável no app | ✅ Disponível |
-| 🔐 Autenticação com JWT | 🔜 Em breve |
+| ⚙️ URL da API configurável via `.env` (`EXPO_PUBLIC_API_BASE_URL`) | ✅ Disponível |
+| 💬 Coach IA em conversa (respostas reais da IA no chat) | 🚧 Prévia: respostas ainda são fixas |
+| 🔐 Login e autenticação com JWT | 🔜 Em breve (a tela de login ainda é só visual) |
+| 📈 Registro de carga por série e progressão | 🔜 Em breve |
+| ⏱️ Timer de descanso entre séries | 🔜 Em breve |
 | 🔔 Notificações push de lembrete | 🔜 Em breve |
 
 ---
@@ -57,7 +63,8 @@ treino-app/                  ← Monorepo
     ├── app/                 ← Telas (Expo Router)
     ├── components/          ← Componentes reutilizáveis
     ├── hooks/               ← Custom hooks
-    ├── lib/                 ← Utilitários e configurações
+    ├── constants/brand.ts   ← Tokens de design (cores de anilha, fontes)
+    ├── lib/                 ← API, perfil, progresso do dia, utilitários
     └── shared/              ← Tipos e constantes compartilhadas
 ```
 
@@ -88,8 +95,8 @@ App Mobile → POST /gerar-treino-ia → Backend FastAPI
 ### Mobile
 - **[React Native](https://reactnative.dev)** + **[Expo](https://expo.dev)** — Framework mobile cross-platform
 - **[Expo Router](https://expo.github.io/router)** — Roteamento baseado em arquivos
-- **[NativeWind](https://nativewind.dev)** — TailwindCSS para React Native
-- **[Drizzle ORM](https://orm.drizzle.team)** — ORM TypeScript para banco local (SQLite)
+- **[AsyncStorage](https://react-native-async-storage.github.io/async-storage/)** — Perfil, último plano e progresso do dia salvos no aparelho
+- **[Expo Google Fonts](https://github.com/expo/google-fonts)** — Big Shoulders Display (títulos) e Barlow (texto)
 
 ### Infraestrutura
 - **[Neon.tech](https://neon.tech)** — PostgreSQL serverless (produção)
@@ -182,10 +189,14 @@ Documentação interativa (Swagger): `http://localhost:8000/docs`
 ```bash
 cd mobile
 npm install
+cp .env.example .env   # aponte EXPO_PUBLIC_API_BASE_URL para o backend
 npx expo start
 ```
 
 Escaneie o QR Code com o **Expo Go** no seu celular, ou pressione `a` para Android / `i` para iOS no simulador.
+Para abrir no navegador, use `npx expo start --web`.
+
+> 💡 No celular físico, use o IP da sua máquina em `EXPO_PUBLIC_API_BASE_URL` (por exemplo, `http://192.168.1.10:8000`), não `localhost`.
 
 ---
 
@@ -197,7 +208,22 @@ make test
 
 # Ou diretamente com Pytest
 cd backend && pytest -v
+
+# Checagem de tipos do app mobile
+cd mobile && npm run type-check
 ```
+
+Os testes do backend não chamam a API de IA real: a chamada externa é simulada, então rodam rápido e sem `TREINO_API_KEY`.
+
+---
+
+## ⚠️ Limitações Conhecidas
+
+- **Login apenas visual:** os botões de entrar (e-mail, Google e Apple) abrem o app direto, e todos os usuários compartilham o ID definido em `EXPO_PUBLIC_TREINO_USER_ID`. Por isso a rota `/historico/{user_id}` não deve ser exposta publicamente até a autenticação existir.
+- **Coach IA:** o chat ainda responde com mensagens fixas e o card de plano sugerido é estático; o botão "Gerar treino" usa os dados do perfil, não o texto da conversa.
+- **API de IA externa:** o backend envia o perfil completo (altura, peso, idade, frequência e tempo), mas a API no Render precisa ler esses campos para que eles influenciem o treino.
+- **Unidade da altura:** o app guarda a altura em centímetros; o exemplo da API usa metros.
+- **NativeWind:** está instalado, mas o `global.css` não é importado, então classes `className` não têm efeito. As telas usam `StyleSheet`.
 
 ---
 
