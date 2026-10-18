@@ -2,7 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { brand } from "@/constants/brand";
+import { brand, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 
 type ScreenHeaderProps = { title: string; subtitle?: string; right?: React.ReactNode };
@@ -12,7 +12,7 @@ export function ScreenHeader({ title, subtitle, right }: ScreenHeaderProps) {
   return (
     <View style={styles.header}>
       <Pressable accessibilityLabel="Voltar" onPress={() => { haptic.light(); router.back(); }} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-        <MaterialIcons name="arrow-back" size={25} color={brand.text} />
+        <MaterialIcons name="arrow-back" size={22} color={brand.text} />
       </Pressable>
       <View style={styles.titleArea}>
         <Text numberOfLines={1} style={styles.title}>{title}</Text>
@@ -24,10 +24,10 @@ export function ScreenHeader({ title, subtitle, right }: ScreenHeaderProps) {
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 52 },
+  header: { alignItems: "center", flexDirection: "row", gap: 8, minHeight: 56 },
   back: { alignItems: "center", height: 42, justifyContent: "center", width: 42 },
   titleArea: { flex: 1 },
-  title: { color: brand.text, fontSize: 19, fontWeight: "800" },
-  subtitle: { color: brand.muted, fontSize: 13, marginTop: 2 },
-  pressed: { opacity: 0.65 },
+  title: { ...type.title, fontSize: 17 },
+  subtitle: { ...type.label, fontSize: 10, marginTop: 3 },
+  pressed: { opacity: 0.6 },
 });

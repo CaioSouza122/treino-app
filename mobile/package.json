@@ -12,6 +12,7 @@
     "type-check": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
+    "@expo-google-fonts/chakra-petch": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.8.12",
@@ -42,7 +43,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
-    "react-native-reanimated": "~3.16.1",
+    "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",

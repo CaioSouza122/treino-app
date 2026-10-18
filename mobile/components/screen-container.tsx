@@ -1,6 +1,7 @@
 import { View, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
+import { brand, ui } from "@/constants/brand";
 import { cn } from "@/lib/utils";
 
 export interface ScreenContainerProps extends ViewProps {
@@ -21,6 +22,10 @@ export interface ScreenContainerProps extends ViewProps {
    * Additional className for the SafeAreaView (content layer).
    */
   safeAreaClassName?: string;
+  /** Aplica o padding horizontal padrão (ui.screenPadding). Padrão: true. */
+  padded?: boolean;
+  /** Remove o fundo opaco (usado em telas que abrem como modal sobre outra). */
+  transparent?: boolean;
 }
 
 /**
@@ -44,25 +49,25 @@ export function ScreenContainer({
   className,
   containerClassName,
   safeAreaClassName,
+  padded = true,
+  transparent = false,
   style,
   ...props
 }: ScreenContainerProps) {
   return (
     <View
-      style={{ backgroundColor: "#08090D" }}
-      className={cn(
-        "flex-1",
-        "bg-background",
-        containerClassName
-      )}
+      style={{ backgroundColor: transparent ? "transparent" : brand.background, flex: 1 }}
+      className={cn("flex-1", containerClassName)}
       {...props}
     >
       <SafeAreaView
         edges={edges}
         className={cn("flex-1", safeAreaClassName)}
-        style={style}
+        style={[{ flex: 1 }, style]}
       >
-        <View className={cn("flex-1", className)}>{children}</View>
+        <View className={cn("flex-1", className)} style={{ flex: 1, paddingHorizontal: padded ? ui.screenPadding : 0 }}>
+          {children}
+        </View>
       </SafeAreaView>
     </View>
   );

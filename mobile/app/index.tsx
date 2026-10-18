@@ -1,49 +1,110 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { BrandMark } from "@/components/brand-mark";
+import { BrandMark, Wordmark } from "@/components/brand-mark";
 import { PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
-import { brand } from "@/constants/brand";
+import { Label } from "@/components/ui";
+import { brand, font, radius, type } from "@/constants/brand";
 
 export default function LoginScreen() {
   const router = useRouter();
   return (
-    <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5">
+    <ScreenContainer edges={["top", "bottom", "left", "right"]}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.fill}>
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.brandArea}>
-            <BrandMark size={76} withName />
-            <Text style={styles.slogan}>Seu treino, montado por IA</Text>
+            <BrandMark size={84} />
+            <Wordmark size={30} />
+            <Label>Treino montado por IA</Label>
           </View>
+
           <View style={styles.form}>
-            <Field label="E-mail" placeholder="seu@email.com" icon="mail-outline" />
-            <Field label="Senha" placeholder="••••••••" icon="lock-outline" secureTextEntry />
-            <Pressable style={styles.forgot}><Text style={styles.link}>Esqueci a senha</Text></Pressable>
+            <Field label="E-mail" placeholder="seu@email.com" keyboardType="email-address" />
+            <Field label="Senha" placeholder="••••••••" secureTextEntry />
+            <Pressable style={styles.forgot}>
+              <Text style={styles.link}>Esqueci a senha</Text>
+            </Pressable>
             <PrimaryButton label="Entrar" onPress={() => router.replace("/(tabs)")} />
-            <PrimaryButton label="Criar conta" variant="secondary" onPress={() => router.replace("/(tabs)")} style={styles.secondaryButton} />
+            <PrimaryButton label="Criar conta" variant="secondary" onPress={() => router.replace("/(tabs)")} />
           </View>
-          <View style={styles.orLine}><View style={styles.line} /><Text style={styles.or}>ou</Text><View style={styles.line} /></View>
+
+          <View style={styles.orLine}>
+            <View style={styles.line} />
+            <Label>ou</Label>
+            <View style={styles.line} />
+          </View>
+
           <View style={styles.socials}>
-            <SocialButton icon="G" label="Continuar com Google" />
-            <SocialButton icon="" label="Continuar com Apple" />
+            <SocialButton label="Continuar com Google" />
+            <SocialButton label="Continuar com Apple" />
           </View>
-          <Text style={styles.terms}>Ao entrar, você concorda com os <Text style={styles.link}>Termos de Uso</Text>.</Text>
-        </View>
+
+          <Text style={styles.terms}>
+            Ao entrar, você concorda com os <Text style={styles.termsLink}>Termos de Uso</Text>.
+          </Text>
+        </ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
 
-function Field({ label, placeholder, icon, secureTextEntry = false }: { label: string; placeholder: string; icon: keyof typeof MaterialIcons.glyphMap; secureTextEntry?: boolean }) {
-  return <View><Text style={styles.fieldLabel}>{label}</Text><View style={styles.inputWrap}><MaterialIcons color={brand.muted} name={icon} size={21} /><TextInput accessibilityLabel={label} placeholder={placeholder} placeholderTextColor={brand.dim} secureTextEntry={secureTextEntry} style={styles.input} /></View></View>;
+function Field({
+  label,
+  placeholder,
+  secureTextEntry = false,
+  keyboardType = "default",
+}: {
+  label: string;
+  placeholder: string;
+  secureTextEntry?: boolean;
+  keyboardType?: "default" | "email-address";
+}) {
+  return (
+    <View style={styles.field}>
+      <Label>{label}</Label>
+      <TextInput
+        accessibilityLabel={label}
+        autoCapitalize="none"
+        keyboardType={keyboardType}
+        placeholder={placeholder}
+        placeholderTextColor={brand.dim}
+        secureTextEntry={secureTextEntry}
+        style={styles.input}
+      />
+    </View>
+  );
 }
 
-function SocialButton({ icon, label }: { icon: string; label: string }) {
-  return <Pressable onPress={() => {}} style={({ pressed }) => [styles.socialButton, pressed && styles.pressed]}><Text style={styles.socialIcon}>{icon}</Text><Text style={styles.socialText}>{label}</Text></Pressable>;
+function SocialButton({ label }: { label: string }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => {}}
+      style={({ pressed }) => [styles.socialButton, pressed && styles.pressed]}
+    >
+      <Text style={styles.socialText}>{label}</Text>
+      <MaterialIcons name="arrow-forward" size={16} color={brand.dim} />
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 }, content: { flex: 1, justifyContent: "center", paddingVertical: 18 }, brandArea: { alignItems: "center", marginBottom: 42 }, slogan: { color: brand.muted, fontSize: 15, marginTop: 14 }, form: { gap: 16 }, fieldLabel: { color: brand.text, fontSize: 15, fontWeight: "700", marginBottom: 8 }, inputWrap: { alignItems: "center", backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 16, borderWidth: 1, flexDirection: "row", height: 56, paddingHorizontal: 16 }, input: { color: brand.text, flex: 1, fontSize: 16, marginLeft: 11 }, forgot: { alignSelf: "flex-start", marginTop: -6 }, link: { color: brand.blueLight, fontWeight: "700" }, secondaryButton: { marginTop: -4 }, orLine: { alignItems: "center", flexDirection: "row", gap: 14, marginVertical: 24 }, line: { backgroundColor: brand.border, flex: 1, height: 1 }, or: { color: brand.muted, fontSize: 14 }, socials: { gap: 12 }, socialButton: { alignItems: "center", backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 16, borderWidth: 1, flexDirection: "row", height: 54, justifyContent: "center" }, socialIcon: { color: brand.blueLight, fontSize: 22, fontWeight: "900", left: 20, position: "absolute" }, socialText: { color: brand.text, fontSize: 15, fontWeight: "700" }, terms: { color: brand.muted, fontSize: 12, marginTop: 30, textAlign: "center" }, pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
+  fill: { flex: 1 },
+  content: { flexGrow: 1, gap: 28, justifyContent: "center", paddingVertical: 24 },
+  brandArea: { alignItems: "center", gap: 14, marginBottom: 8 },
+  form: { gap: 16 },
+  field: { gap: 8 },
+  input: { backgroundColor: brand.surface, borderColor: brand.borderStrong, borderRadius: radius.md, borderWidth: 1, color: brand.text, fontSize: 16, height: 54, paddingHorizontal: 16 },
+  forgot: { alignSelf: "flex-start", marginTop: -4 },
+  link: { color: brand.cyan, fontSize: 13, fontWeight: "600" },
+  orLine: { alignItems: "center", flexDirection: "row", gap: 14 },
+  line: { backgroundColor: brand.border, flex: 1, height: 1 },
+  socials: { gap: 10 },
+  socialButton: { alignItems: "center", borderColor: brand.border, borderRadius: radius.md, borderWidth: 1, flexDirection: "row", height: 52, justifyContent: "space-between", paddingHorizontal: 18 },
+  socialText: { color: brand.text, fontFamily: font.displayMedium, fontSize: 14, letterSpacing: 0.3 },
+  terms: { ...type.caption, textAlign: "center" },
+  termsLink: { color: brand.text },
+  pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
 });

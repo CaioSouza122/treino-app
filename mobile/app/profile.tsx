@@ -13,7 +13,8 @@ import Animated, { FadeIn, SlideInLeft, ReduceMotion } from "react-native-reanim
 
 import { BrandMark } from "@/components/brand-mark";
 import { ScreenContainer } from "@/components/screen-container";
-import { brand } from "@/constants/brand";
+import { Label, SectionHead } from "@/components/ui";
+import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
 
@@ -66,9 +67,9 @@ export default function ProfileScreen() {
 
   return (
     <ScreenContainer
-      containerClassName="bg-transparent"
+      transparent
       edges={["top", "bottom", "left", "right"]}
-      className="px-0"
+      padded={false}
     >
       <View style={styles.fill}>
         {/* ── Scrim (fundo escuro clicável para fechar) ─────────────── */}
@@ -93,7 +94,7 @@ export default function ProfileScreen() {
             >
               <MaterialIcons name="close" color={brand.muted} size={22} />
             </Pressable>
-            <BrandMark size={40} />
+            <BrandMark size={32} />
           </View>
 
           <ScrollView
@@ -108,11 +109,11 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <Text style={styles.name}>{profile.name || "Seu perfil"}</Text>
-              <Text style={styles.plan}>Perfil de treino personalizado</Text>
+              <Label>Perfil de treino</Label>
             </View>
 
             {/* ── Formulário ───────────────────────────────────────── */}
-            <Text style={styles.sectionTitle}>Dados para a IA</Text>
+            <SectionHead title="Dados para a IA" />
 
             <Field
               label="Nome"
@@ -189,7 +190,7 @@ export default function ProfileScreen() {
                 saving && styles.disabled,
               ]}
             >
-              <MaterialIcons name="save" color={brand.text} size={19} />
+              <MaterialIcons name="check" color={brand.onLime} size={19} />
               <Text style={styles.saveText}>
                 {saving ? "Salvando..." : saved ? "Perfil salvo" : "Salvar perfil"}
               </Text>
@@ -209,7 +210,7 @@ export default function ProfileScreen() {
                   }}
                   style={({ pressed }) => [styles.item, pressed && styles.pressed]}
                 >
-                  <MaterialIcons name={item.icon} size={22} color={brand.blueLight} />
+                  <MaterialIcons name={item.icon} size={20} color={brand.cyan} />
                   <Text style={styles.itemText}>{item.label}</Text>
                   <MaterialIcons name="chevron-right" size={21} color={brand.dim} />
                 </Pressable>
@@ -258,29 +259,27 @@ function Field({
 
 const styles = StyleSheet.create({
   fill: { backgroundColor: "transparent", flex: 1 },
-  scrim: { backgroundColor: "rgba(0,0,0,0.52)", bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
+  scrim: { backgroundColor: "rgba(0,0,0,0.6)", bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
   fullPress: { flex: 1 },
-  drawer: { backgroundColor: brand.background, borderBottomRightRadius: 28, borderTopRightRadius: 28, height: "100%", width: "92%" },
+  drawer: { backgroundColor: brand.background, borderRightColor: brand.border, borderRightWidth: 1, height: "100%", width: "92%" },
   drawerTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 8 },
   close: { alignItems: "center", height: 40, justifyContent: "center", width: 40 },
-  content: { gap: 15, padding: 20 },
-  profile: { alignItems: "center" },
-  avatar: { alignItems: "center", backgroundColor: brand.blueSoft, borderColor: brand.blue, borderRadius: 44, borderWidth: 2, height: 78, justifyContent: "center", width: 78 },
-  avatarText: { color: brand.text, fontSize: 21, fontWeight: "900" },
-  name: { color: brand.text, fontSize: 22, fontWeight: "900", marginTop: 10 },
-  plan: { color: brand.muted, fontSize: 12, marginTop: 4 },
-  sectionTitle: { color: brand.text, fontSize: 17, fontWeight: "900", marginTop: 5 },
+  content: { gap: 16, padding: 20 },
+  profile: { alignItems: "center", gap: 8 },
+  avatar: { alignItems: "center", borderColor: brand.lime, borderRadius: radius.md, borderWidth: 1.5, height: 72, justifyContent: "center", width: 72 },
+  avatarText: { color: brand.text, fontFamily: font.display, fontSize: 22, letterSpacing: 0.6 },
+  name: { ...type.h2, marginTop: 6 },
   row: { flexDirection: "row", gap: 10 },
-  field: { flex: 1, gap: 6 },
-  label: { color: brand.muted, fontSize: 11, fontWeight: "700" },
-  input: { backgroundColor: brand.surface, borderColor: brand.border, borderRadius: 12, borderWidth: 1, color: brand.text, fontSize: 14, minHeight: 42, paddingHorizontal: 11 },
-  save: { alignItems: "center", backgroundColor: brand.blue, borderRadius: 14, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 48 },
-  saveText: { color: brand.text, fontSize: 14, fontWeight: "900" },
-  disabled: { opacity: 0.55 },
-  list: { borderTopColor: brand.border, borderTopWidth: 1, marginTop: 4 },
-  item: { alignItems: "center", borderBottomColor: brand.border, borderBottomWidth: 1, flexDirection: "row", gap: 14, minHeight: 52 },
-  itemText: { color: brand.text, flex: 1, fontSize: 14, fontWeight: "700" },
-  logout: { alignItems: "center", flexDirection: "row", gap: 13, minHeight: 50, paddingHorizontal: 4 },
-  logoutText: { color: brand.danger, fontSize: 15, fontWeight: "800" },
-  pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
+  field: { flex: 1, gap: 7 },
+  label: { ...type.label, fontSize: 10 },
+  input: { backgroundColor: brand.surface, borderColor: brand.borderStrong, borderRadius: radius.sm + 2, borderWidth: 1, color: brand.text, fontSize: 15, minHeight: 44, paddingHorizontal: 12 },
+  save: { alignItems: "center", backgroundColor: brand.lime, borderRadius: radius.md, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 50 },
+  saveText: { color: brand.onLime, fontFamily: font.display, fontSize: 13, letterSpacing: 1.2, textTransform: "uppercase" },
+  disabled: { opacity: 0.5 },
+  list: { borderTopColor: brand.border, borderTopWidth: 1, marginTop: 6 },
+  item: { alignItems: "center", borderBottomColor: brand.border, borderBottomWidth: 1, flexDirection: "row", gap: 14, minHeight: 54 },
+  itemText: { color: brand.text, flex: 1, fontSize: 15, fontWeight: "600" },
+  logout: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 50, paddingHorizontal: 2 },
+  logoutText: { color: brand.danger, fontSize: 14.5, fontWeight: "700" },
+  pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
 });

@@ -14,7 +14,7 @@ const config: ExpoConfig = {
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#08090D",
+      backgroundColor: "#050607",
       foregroundImage: "./assets/images/android-icon-foreground.png",
     },
     package: "com.app.hipertrofiaapp",
@@ -32,9 +32,9 @@ const config: ExpoConfig = {
         image: "./assets/images/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",
-        backgroundColor: "#08090D",
+        backgroundColor: "#050607",
         dark: {
-          backgroundColor: "#08090D",
+          backgroundColor: "#050607",
         },
       },
     ],
