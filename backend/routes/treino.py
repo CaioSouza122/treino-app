@@ -1,12 +1,15 @@
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+try:
+    from sqlalchemy import select
+except ImportError:
+    from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from database.connection import get_db
 from schemas.treino_schema import TreinoRequest, WorkoutResponse
 from services.ia_service import gerar_treino_ia, testar_conexao_flask
 from models.user import User, Workout, WorkoutDay
-from typing import List, Optional
+from typing import List
 import uuid
 
 router = APIRouter()
@@ -31,7 +34,7 @@ async def gerar_treino(
     """
     # 1. Gera o treino via IA ou fallback local
     try:
-        resultado = gerar_treino_ia(dados)
+        resultado = await gerar_treino_ia(dados)
         if not resultado:
             raise HTTPException(status_code=500, detail="Não foi possível gerar o treino")
     except Exception as e:
@@ -86,10 +89,10 @@ async def gerar_treino(
         
         await db.commit()
     except Exception as db_err:
-        print(f"⚠️ Erro ao salvar treino no banco de dados: {db_err}")
+        print(f"[WARN] Erro ao salvar treino no banco de dados: {db_err}")
         try:
             await db.rollback()
-        except:
+        except Exception:
             pass
 
     return resultado
