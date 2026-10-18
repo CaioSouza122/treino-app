@@ -34,7 +34,7 @@ async def gerar_treino(
     """
     # 1. Gera o treino via IA ou fallback local
     try:
-        resultado = gerar_treino_ia(dados)
+        resultado = await gerar_treino_ia(dados)
         if not resultado:
             raise HTTPException(status_code=500, detail="Não foi possível gerar o treino")
     except Exception as e:
@@ -89,7 +89,7 @@ async def gerar_treino(
         
         await db.commit()
     except Exception as db_err:
-        print(f"⚠️ Erro ao salvar treino no banco de dados: {db_err}")
+        print(f"[WARN] Erro ao salvar treino no banco de dados: {db_err}")
         try:
             await db.rollback()
         except Exception:

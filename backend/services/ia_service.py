@@ -17,7 +17,7 @@ _cache = {}
 _cache_tempo = {}
 
 
-def gerar_treino_ia(dados):
+async def gerar_treino_ia(dados):
     """
     Gera treino personalizado chamando a API no Render (que usa o Gemini internamente).
     Faz fallback local caso a API esteja inacessível.
@@ -26,17 +26,17 @@ def gerar_treino_ia(dados):
         chave = hashlib.md5(str(dados.__dict__).encode()).hexdigest()
 
         if chave in _cache and datetime.now() < _cache_tempo.get(chave, datetime.min):
-            print("📦 Usando resposta do cache")
+            print("[CACHE] Usando resposta do cache")
             return _cache[chave]
 
-        resposta = _chamar_api_externa_sync(dados)
+        resposta = await _chamar_api_externa(dados)
 
         if resposta:
             _cache[chave] = resposta
             _cache_tempo[chave] = datetime.now() + timedelta(hours=1)
             return resposta
 
-        print("⚠️ API externa indisponível — usando fallback local.")
+        print("[INFO] API externa indisponivel - usando engine de fallback local.")
         resposta = _gerar_treino_local(dados)
         if resposta:
             _cache[chave] = resposta
@@ -44,7 +44,7 @@ def gerar_treino_ia(dados):
         return resposta
 
     except Exception as e:
-        print(f"❌ Erro geral: {e}")
+        print(f"[ERRO] Erro geral ao gerar treino: {e}")
         return _gerar_treino_local(dados)
 
 
@@ -147,90 +147,102 @@ def _gerar_treino_local(dados) -> list:
     template = divisoes[freq_valida][:frequencia]
 
     obs_objetivo = {
-        "hipertrofia": "Foco em hipertrofia: descanso 60–90s entre séries, progressão de carga semanal.",
-        "emagrecimento": "Foco em emagrecimento: intervalos curtos 30–45s, circuitos quando possível.",
-        "forca": "Foco em força: descanso 2–3min entre séries, cargas elevadas com menos repetições.",
-        "resistencia": "Foco em resistência: repetições altas (15–20), intervalos curtos.",
+        "hipertrofia": "Foco em hipertrofia: descanso 60-90s entre séries, progressão de carga semanal.",
+        "emagrecimento": "Foco em emagrecimento: intervalos curtos 30-45s, circuitos quando possível.",
+        "forca": "Foco em força: descanso 2-3min entre séries, cargas elevadas com menos repetições.",
+        "resistencia": "Foco em resistência: repetições altas (15-20), intervalos curtos.",
         "condicionamento": "Foco em condicionamento: combinar exercícios compostos e aeróbicos.",
     }
     obs = obs_objetivo.get(objetivo, f"Objetivo: {objetivo.capitalize()}. Progrida as cargas semanalmente.")
 
     resultado = []
     for bloco in template:
-        linhas = [f"🎯 {obs}", ""]
+        linhas = [f"PROTOCOLO: {obs}", ""]
         for grupo in bloco["grupos"]:
             exercs = exercicios_db.get(grupo, [])
             if exercs:
-                linhas.append(f"▸ {grupo.upper()}")
-                linhas.extend(f"  • {ex}" for ex in exercs)
+                linhas.append(f"GROUP: {grupo.upper()}")
+                linhas.extend(f"  - {ex}" for ex in exercs)
                 linhas.append("")
-        linhas.append(f"⏱ Tempo estimado: {tempo} min")
+        linhas.append(f"Tempo estimado: {tempo} min")
         resultado.append({
             "dia": bloco["dia"],
             "foco": bloco["foco"],
             "exercicios": "\n".join(linhas).strip(),
         })
 
-    print(f"✅ Treino local gerado com {len(resultado)} dias (fallback)")
+    print(f"[OK] Treino local gerado com {len(resultado)} dias (fallback)")
     return resultado
 
 
-def _chamar_api_externa_sync(dados):
+def montar_payload_ia(dados) -> dict:
     """
-    Chama o endpoint POST /api/v1/treino da API no Render de forma síncrona.
+    Monta o corpo enviado à API de IA com o perfil completo do usuário,
+    para que o treino considere corpo, frequência e tempo disponível.
+    """
+    return {
+        "objetivo": dados.objetivo,
+        "nivel": dados.nivel or "intermediario",
+        "altura": dados.altura,
+        "peso": dados.peso,
+        "idade": dados.idade,
+        "vezes_por_semana": dados.vezes_por_semana,
+        "tempo": dados.tempo,
+    }
+
+
+async def _chamar_api_externa(dados):
+    """
+    Chama o endpoint POST /api/v1/treino da API no Render sem bloquear o event loop.
     """
     headers = {"Content-Type": "application/json"}
     chave_api = TREINO_API_KEY
     if chave_api:
         headers["X-API-KEY"] = chave_api
 
-    payload = {
-        "objetivo": dados.objetivo,
-        "nivel": dados.nivel or "intermediario",
-    }
+    payload = montar_payload_ia(dados)
 
     url = f"{TREINO_API_URL}/treino"
-    print(f"🔗 Chamando API Render: {url}")
-    print(f"📤 Payload: {payload}")
+    print(f"[INFO] Chamando API Render: {url}")
 
     try:
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(url, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
 
-        print(f"📥 Status: {response.status_code}")
+        print(f"[INFO] Status da API Externa: {response.status_code}")
 
         if response.status_code == 401:
-            print(f"🔐 Erro de autenticação! Verifique TREINO_API_KEY no .env")
-            print(f"   Resposta: {response.text}")
+            print(f"[WARN] Erro de autenticação! Verifique TREINO_API_KEY no .env")
             return None
 
         if response.status_code == 429:
-            print(f"⏱️ Rate limit atingido. Aguarde.")
+            print(f"[WARN] Rate limit atingido na API externa. Aguarde.")
             return None
 
         response.raise_for_status()
         data = response.json()
-        print(f"✅ API Render respondeu: {list(data.keys())}")
+        print(f"[OK] API Render respondeu com sucesso: {list(data.keys())}")
 
         treino_texto = data.get("treino_gerado", "")
         if not treino_texto:
-            print(f"❌ Campo 'treino_gerado' vazio na resposta: {data}")
+            print(f"[ERRO] Campo 'treino_gerado' vazio na resposta: {data}")
             return None
 
         return _converter_texto_para_dias(treino_texto, dados)
 
     except httpx.ConnectError as e:
-        print(f"❌ Não conseguiu conectar em {url}: {e}")
+        print(f"[WARN] Nao conseguiu conectar em {url}: {e}")
         return None
     except httpx.TimeoutException:
-        print(f"⏳ Timeout ao chamar {url} (API pode estar dormindo no Render free tier)")
+        print(f"[WARN] Timeout ao chamar {url}")
         return None
     except httpx.HTTPStatusError as e:
-        print(f"❌ Erro HTTP {e.response.status_code}: {e.response.text}")
+        print(f"[ERRO] Erro HTTP {e.response.status_code}: {e.response.text}")
         return None
     except Exception as e:
-        print(f"❌ Erro inesperado: {type(e).__name__}: {e}")
+        print(f"[ERRO] Erro inesperado ao chamar API externa: {type(e).__name__}: {e}")
         return None
+
 
 
 async def testar_conexao_flask():

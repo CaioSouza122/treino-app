@@ -9,6 +9,21 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Adicionado
+- 🏋️ Nova identidade visual: preto com verde-lima (ação e progresso) e ciano (IA), fonte Chakra Petch e nova logo — um "H" de dois músculos com uma linha de gráfico subindo no meio
+- ✅ Checklist de exercícios salvo no aparelho, com campo para anotar a carga (kg) usada em cada exercício concluído
+- 📈 Gráficos na tela inicial: frequência semanal (dias concluídos x planejados) e evolução de força por exercício
+- 🧪 Testes do backend para o envio do perfil completo à IA, sem chamar a API real
+
+### Alterado
+- 🤖 O backend envia o perfil completo à API de IA (altura, peso, idade, frequência e tempo), não só objetivo e nível
+- ⚡ A chamada à API de IA passou a ser assíncrona e não bloqueia mais o servidor durante a geração
+- 📱 Telas redesenhadas: início com próximo treino e gráficos, treino em sessões com checklist, chat com os dados do perfil
+- 📱 Rolagem corrigida no app web
+
+### Removido
+- Menções a exportação para Excel e URL da API configurável dentro do app, que não existem no código atual
+
 ### Em desenvolvimento
 - Autenticação de usuários com JWT
 - Notificações push de lembrete de treino
