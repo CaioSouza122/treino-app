@@ -7,8 +7,8 @@ NIVEIS = ("iniciante", "intermediario", "avancado")
 
 
 class TreinoRequest(BaseModel):
-    # Limites iguais aos da API_Treino, que recusa valores fora deles
-    user_id: str | None = Field(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    # Limites iguais aos da API_Treino, que recusa valores fora deles.
+    # O dono do treino vem do token de login, não do corpo.
     altura: float = Field(ge=1, le=250)
     peso: float = Field(ge=20, le=400)
     idade: int = Field(ge=10, le=100)
@@ -21,7 +21,6 @@ class TreinoRequest(BaseModel):
         str_strip_whitespace=True,
         json_schema_extra={
             "example": {
-                "user_id": "abc-123-uuid",
                 "altura": 175,
                 "peso": 80,
                 "idade": 28,

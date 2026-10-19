@@ -1,55 +1,37 @@
-import time
-import uuid
-from collections import defaultdict, deque
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_db
-from models.user import User, Workout, WorkoutDay
+from models.user import Conta, User, Workout, WorkoutDay
+from routes.auth import conta_atual
 from schemas.treino_schema import TreinoRequest, WorkoutResponse
 from services.ia_service import gerar_treino_ia
+from services.limite import LimitePorCliente
 
 router = APIRouter()
 
-# ── Limite de geração por cliente ────────────────────────────────────────────
-# Cada geração custa uma chamada ao Gemini; sem limite, um único cliente esgota a cota
+# Cada geração custa uma chamada ao Gemini; sem limite, uma única conta esgota a cota
 # da API de IA para todos os usuários.
-# shortcut: contador em memória, por processo. Serve para 1 instância no Render;
-# com várias instâncias, mover para Redis.
-LIMITE_GERACOES = 5
-JANELA_SEGUNDOS = 60
-_geracoes_por_cliente: dict[str, deque] = defaultdict(deque)
-
-
-def _verificar_limite(request: Request) -> None:
-    cliente = request.client.host if request.client else "desconhecido"
-    agora = time.monotonic()
-    historico = _geracoes_por_cliente[cliente]
-    while historico and agora - historico[0] > JANELA_SEGUNDOS:
-        historico.popleft()
-    if len(historico) >= LIMITE_GERACOES:
-        raise HTTPException(
-            status_code=429,
-            detail="Muitos treinos gerados em pouco tempo. Aguarde um minuto e tente de novo.",
-        )
-    historico.append(agora)
-    # Não deixa o dicionário crescer com clientes que já pararam de usar
-    if len(_geracoes_por_cliente) > 10_000:
-        for chave in [
-            c for c, h in _geracoes_por_cliente.items() if not h or agora - h[-1] > JANELA_SEGUNDOS
-        ]:
-            del _geracoes_por_cliente[chave]
+limite_geracoes = LimitePorCliente(
+    limite=5,
+    janela=60,
+    mensagem="Muitos treinos gerados em pouco tempo. Aguarde um minuto e tente de novo.",
+)
 
 
 @router.post("/gerar-treino-ia")
-async def gerar_treino(dados: TreinoRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def gerar_treino(
+    dados: TreinoRequest,
+    request: Request,
+    conta: Conta = Depends(conta_atual),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Gera treino personalizado usando IA (com fallback automático) e salva no banco de dados.
     """
-    _verificar_limite(request)
+    limite_geracoes(request, chave=conta.id)
 
     # 1. Gera o treino via IA ou fallback local
     try:
@@ -64,7 +46,8 @@ async def gerar_treino(dados: TreinoRequest, request: Request, db: AsyncSession 
 
     # 2. Tenta salvar no PostgreSQL de forma resiliente
     try:
-        user_id = dados.user_id or str(uuid.uuid4())
+        # O dono do treino vem do token, nunca do corpo da requisição
+        user_id = conta.id
 
         # Busca se o usuário já existe
         result = await db.execute(select(User).where(User.id == user_id))
@@ -120,15 +103,15 @@ async def gerar_treino(dados: TreinoRequest, request: Request, db: AsyncSession 
     return resultado
 
 
-@router.get("/historico/{user_id}", response_model=list[WorkoutResponse])
-async def obter_historico(user_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/historico", response_model=list[WorkoutResponse])
+async def obter_historico(conta: Conta = Depends(conta_atual), db: AsyncSession = Depends(get_db)):
     """
-    Recupera os 50 treinos mais recentes do usuário, do mais novo para o mais antigo.
+    Recupera os 50 treinos mais recentes da conta logada, do mais novo para o mais antigo.
     """
     try:
         result = await db.execute(
             select(Workout)
-            .where(Workout.user_id == user_id)
+            .where(Workout.user_id == conta.id)
             .options(selectinload(Workout.days))
             .order_by(Workout.created_at.desc())
             .limit(50)

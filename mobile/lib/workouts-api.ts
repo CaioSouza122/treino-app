@@ -10,7 +10,6 @@ export type WorkoutRequest = {
   objetivo: string;
   tempo: number;
   nivel?: string;
-  user_id?: string;
 };
 
 export type WorkoutDay = {
@@ -37,8 +36,9 @@ export async function generateWorkout(payload: WorkoutRequest): Promise<WorkoutD
   });
 }
 
-export async function getWorkoutHistory(userId: string): Promise<Workout[]> {
-  return apiCall<Workout[]>(`/historico/${encodeURIComponent(userId)}`);
+/** Histórico da conta logada (o backend identifica o usuário pelo token). */
+export async function getWorkoutHistory(): Promise<Workout[]> {
+  return apiCall<Workout[]>("/historico");
 }
 
 export async function saveLastWorkout(workout: LocalWorkout): Promise<void> {
@@ -60,7 +60,7 @@ export async function getLastWorkout(): Promise<LocalWorkout | null> {
 export function workoutFromGeneratedDays(days: WorkoutDay[], payload: WorkoutRequest): LocalWorkout {
   return {
     id: `local-${Date.now()}`,
-    user_id: payload.user_id ?? "local-user",
+    user_id: "local",
     created_at: new Date().toISOString(),
     days,
     source: "generated",

@@ -3,12 +3,10 @@
 from datetime import datetime
 
 import pytest
-from httpx import ASGITransport, AsyncClient
 
-from app.main import app
-from routes import treino as treino_routes
 from schemas.treino_schema import TreinoRequest, WorkoutResponse
 from services import ia_service
+from tests.conftest import cadastrar, cliente
 
 PAYLOAD = {
     "altura": 175,
@@ -27,11 +25,6 @@ def api_externa_offline(monkeypatch):
         return None
 
     monkeypatch.setattr(ia_service, "_chamar_api_externa", offline)
-    treino_routes._geracoes_por_cliente.clear()
-
-
-def cliente():
-    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
 @pytest.mark.asyncio
@@ -42,12 +35,12 @@ def cliente():
         ("altura", 99999),
         ("vezes_por_semana", 9),
         ("objetivo", "x" * 1000),
-        ("user_id", "../etc"),
     ],
 )
 async def test_entrada_fora_dos_limites_retorna_422(campo, valor):
     async with cliente() as c:
-        response = await c.post("/gerar-treino-ia", json={**PAYLOAD, campo: valor})
+        headers = await cadastrar(c)
+        response = await c.post("/gerar-treino-ia", json={**PAYLOAD, campo: valor}, headers=headers)
     assert response.status_code == 422
 
 
@@ -66,11 +59,18 @@ def test_nivel_livre_e_normalizado(digitado, esperado):
 
 
 @pytest.mark.asyncio
-async def test_limite_de_geracoes_por_cliente():
+async def test_limite_de_geracoes_por_conta():
     async with cliente() as c:
-        status = [(await c.post("/gerar-treino-ia", json=PAYLOAD)).status_code for _ in range(6)]
+        conta_a = await cadastrar(c)
+        conta_b = await cadastrar(c)
+        status = [
+            (await c.post("/gerar-treino-ia", json=PAYLOAD, headers=conta_a)).status_code
+            for _ in range(6)
+        ]
+        outra_conta = await c.post("/gerar-treino-ia", json=PAYLOAD, headers=conta_b)
     assert status[:5] == [200] * 5
     assert status[5] == 429
+    assert outra_conta.status_code == 200  # o limite é por conta, não global
 
 
 @pytest.mark.asyncio

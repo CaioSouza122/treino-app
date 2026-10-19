@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import models.user  # noqa: F401 — garante que os modelos são importados
 from database.connection import Base, engine
-from routes import treino
+from routes import auth, treino
 
 
 @asynccontextmanager
@@ -51,6 +51,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(treino.router)
 
 

@@ -1,4 +1,7 @@
 // Cliente HTTP do backend FastAPI (EXPO_PUBLIC_API_BASE_URL).
+import { router } from "expo-router";
+
+import { encerrarSessao, getToken } from "@/lib/session";
 
 // Render acorda o serviço em ~20s e o Gemini leva outros ~20s para gerar o treino
 const TIMEOUT_MS = 90_000;
@@ -22,17 +25,28 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
+  const token = await getToken();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
     const response = await fetch(url, {
       ...options,
-      headers: { "Content-Type": "application/json", ...((options.headers as Record<string, string>) || {}) },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...((options.headers as Record<string, string>) || {}),
+      },
       signal: controller.signal,
     });
 
     const text = await response.text();
+    // Token vencido ou inválido numa rota protegida: sai da conta e volta para o login.
+    // (Em /auth/* o 401 é só "senha errada" e a tela de login mostra a mensagem.)
+    if (response.status === 401 && token && !endpoint.startsWith("/auth/")) {
+      await encerrarSessao();
+      router.replace("/login");
+    }
     if (!response.ok) {
       let message = text;
       try {

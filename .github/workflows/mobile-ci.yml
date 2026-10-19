@@ -2,7 +2,7 @@ name: 📱 Mobile CI
 
 on:
   push:
-    branches: [main, develop, fature_1, "fature_*"]
+    branches: [main, develop, "feature/**", "fix/**"]
     paths:
       - "mobile/**"
       - ".github/workflows/mobile-ci.yml"

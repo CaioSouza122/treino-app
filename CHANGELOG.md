@@ -10,6 +10,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- 🔐 Login real com e-mail e senha: cadastro, entrar, sessão de 30 dias (JWT) e sair; histórico por conta
 - 🏋️ Nova identidade visual: preto com verde-lima (ação e progresso) e ciano (IA), fonte Chakra Petch e nova logo — um "H" de dois músculos com uma linha de gráfico subindo no meio
 - ✅ Checklist de exercícios salvo no aparelho, com campo para anotar a carga (kg) usada em cada exercício concluído
 - 📈 Gráficos na tela inicial: frequência semanal (dias concluídos x planejados) e evolução de força por exercício

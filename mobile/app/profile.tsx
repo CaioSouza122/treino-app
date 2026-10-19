@@ -17,6 +17,7 @@ import { Label, SectionHead } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
+import { encerrarSessao } from "@/lib/session";
 
 const menu = [
   { icon: "fitness-center", label: "Meus treinos" },
@@ -219,7 +220,11 @@ export default function ProfileScreen() {
 
             {/* ── Logout ───────────────────────────────────────────── */}
             <Pressable
-              onPress={() => router.replace("/")}
+              onPress={async () => {
+                haptic.light();
+                await encerrarSessao();
+                router.replace("/login");
+              }}
               style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
             >
               <MaterialIcons name="logout" size={21} color={brand.danger} />

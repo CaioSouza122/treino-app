@@ -2,9 +2,9 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from routes import treino as treino_routes
 from schemas.treino_schema import TreinoRequest
 from services import ia_service
+from tests.conftest import cadastrar
 
 # Referência à função real, guardada antes do fixture substituí-la.
 chamar_api_externa_real = ia_service._chamar_api_externa
@@ -28,7 +28,6 @@ def api_externa_offline(monkeypatch):
         return None
 
     monkeypatch.setattr(ia_service, "_chamar_api_externa", offline)
-    treino_routes._geracoes_por_cliente.clear()
 
 
 @pytest.mark.asyncio
@@ -44,7 +43,8 @@ async def test_home():
 async def test_gerar_treino_payload_invalido():
     """Verifica que dados incompletos retornam 422 (Unprocessable Entity)."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.post("/gerar-treino-ia", json={})
+        headers = await cadastrar(client)
+        response = await client.post("/gerar-treino-ia", json={}, headers=headers)
     assert response.status_code == 422
 
 
@@ -52,7 +52,8 @@ async def test_gerar_treino_payload_invalido():
 async def test_gerar_treino_basico():
     """Verifica que um request válido retorna uma lista de treinos (via fallback local)."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.post("/gerar-treino-ia", json=PAYLOAD)
+        headers = await cadastrar(client)
+        response = await client.post("/gerar-treino-ia", json=PAYLOAD, headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)

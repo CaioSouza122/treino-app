@@ -54,9 +54,10 @@ aceita chamadas com a chave `X-API-KEY`, e o backend envia o mesmo valor configu
 | 🏋️ Próximo treino em destaque e plano da semana | ✅ |
 | ✅ Checklist de exercícios com progresso salvo no dia | ✅ |
 | 📈 Registro de carga, gráficos de frequência e de evolução de força | ✅ |
-| ☁️ Histórico de treinos no PostgreSQL (Neon), separado por aparelho | ✅ |
+| 🔐 Login com e-mail e senha (cadastro, sessão de 30 dias, sair) | ✅ |
+| ☁️ Histórico de treinos no PostgreSQL (Neon), por conta | ✅ |
 | 💬 Coach IA em conversa | 🚧 Prévia: respostas ainda são fixas |
-| 🔐 Login de verdade | 🔜 A tela de login ainda é só visual |
+| 🔑 Login com Google/Apple · recuperar senha | 🔜 |
 | ⏱️ Timer de descanso · 🔔 Lembretes | 🔜 |
 
 ---
@@ -67,7 +68,9 @@ aceita chamadas com a chave `X-API-KEY`, e o backend envia o mesmo valor configu
 treino-app/
 ├── backend/                  # API REST (FastAPI)
 │   ├── app/main.py           # Aplicação, CORS e ciclo de vida
-│   ├── routes/treino.py      # /gerar-treino-ia e /historico/{user_id}
+│   ├── routes/auth.py        # /auth/cadastro, /auth/login, /auth/me
+│   ├── routes/treino.py      # /gerar-treino-ia e /historico (exigem login)
+│   ├── services/auth_service.py # Hash de senha (scrypt) e tokens JWT
 │   ├── services/ia_service.py# Chamada à API_Treino, conversão em dias, treino de reserva
 │   ├── models/user.py        # Tabelas app_usuarios, app_treinos, app_treino_dias
 │   ├── schemas/              # Validação de entrada e formato de saída (Pydantic v2)
@@ -75,10 +78,10 @@ treino-app/
 │   ├── migrations/           # Migrations versionadas (Alembic)
 │   └── tests/                # Pytest (a IA é sempre simulada)
 ├── mobile/                   # App (Expo + Expo Router)
-│   ├── app/                  # Telas: início, coach, treinos, detalhe, perfil
+│   ├── app/                  # Telas: login, início, coach, treinos, detalhe, perfil
 │   ├── components/           # Componentes de interface
 │   ├── constants/brand.ts    # Tokens de design (cores, fontes, raios)
-│   └── lib/                  # Cliente da API, perfil, ID do aparelho, progresso
+│   └── lib/                  # Cliente da API, sessão (token), perfil, progresso
 ├── render.yaml               # Blueprint de deploy (backend + app web)
 ├── docker-compose.yml        # Backend + Postgres local para desenvolvimento
 └── Makefile                  # Atalhos (install, backend, mobile, migrate, test, lint)
@@ -120,6 +123,7 @@ API em `http://localhost:8000`, documentação interativa em `http://localhost:8
 | `TREINO_API_URL` | Não | URL da API_Treino. Padrão: `https://api-treino-ygh4.onrender.com/api/v1`. |
 | `DATABASE_URL` | Não | Connection string do Neon. Vazio = SQLite local `treinoapp.db`. |
 | `ALLOWED_ORIGINS` | Não | Origens do app web para CORS, separadas por vírgula. Padrão: Expo web local (`:8081`). |
+| `JWT_SECRET` | Em produção | Assina os tokens de login. Trocar o valor desloga todo mundo. Sem ele (só em desenvolvimento) o backend usa um segredo temporário. |
 
 ### Mobile
 
@@ -133,7 +137,6 @@ npx expo start                   # QR Code no Expo Go · "w" abre no navegador
 | Variável | Descrição |
 | --- | --- |
 | `EXPO_PUBLIC_API_BASE_URL` | URL do backend. No celular físico use o IP da máquina (`http://192.168.x.x:8000`), não `localhost`. |
-| `EXPO_PUBLIC_TREINO_USER_ID` | Só para desenvolvimento: força um ID fixo. Sem ela, cada aparelho gera um ID anônimo próprio. |
 
 ### Com Docker
 
@@ -156,17 +159,24 @@ make docker-up                   # backend com hot-reload + Postgres local
 
 ## Endpoints do backend
 
-| Método | Rota | Descrição |
-| --- | --- | --- |
-| `GET` | `/` | Health check |
-| `POST` | `/gerar-treino-ia` | Gera o treino, salva no histórico e devolve os dias |
-| `GET` | `/historico/{user_id}` | 50 treinos mais recentes daquele aparelho |
+| Método | Rota | Login | Descrição |
+| --- | --- | :---: | --- |
+| `GET` | `/` | — | Health check |
+| `POST` | `/auth/cadastro` | — | `{nome, email, senha}` → `201 {token, usuario}`; e-mail repetido → `409` |
+| `POST` | `/auth/login` | — | `{email, senha}` → `{token, usuario}`; dados errados → `401` |
+| `GET` | `/auth/me` | ✔ | Dados da conta logada |
+| `POST` | `/gerar-treino-ia` | ✔ | Gera o treino, salva no histórico da conta e devolve os dias |
+| `GET` | `/historico` | ✔ | 50 treinos mais recentes da conta |
+
+As rotas com login exigem o cabeçalho `Authorization: Bearer <token>`. O token vale 30 dias;
+vencido ou inválido, a resposta é `401` e o app volta para a tela de login.
+Senhas têm no mínimo 8 caracteres e são guardadas só como hash `scrypt` com sal. O login responde
+igual para senha errada e e-mail inexistente, e aceita no máximo 10 tentativas por minuto por IP.
 
 `POST /gerar-treino-ia`:
 
 ```json
 {
-  "user_id": "8f14e45f-...",
   "altura": 178, "peso": 80, "idade": 28,
   "vezes_por_semana": 4, "tempo": 60,
   "objetivo": "hipertrofia", "nivel": "Intermediário"
@@ -176,7 +186,7 @@ make docker-up                   # backend com hot-reload + Postgres local
 - Limites: altura 1–250, peso 20–400, idade 10–100, frequência 1–7, tempo 10–300 min,
   objetivo 3–255 caracteres. Fora disso a resposta é `422`.
 - `nivel` aceita texto livre ("Avançado", "INICIANTE") e é convertido para o formato da API de IA.
-- No máximo 5 gerações por minuto por cliente (`429` acima disso).
+- No máximo 5 gerações por minuto por conta (`429` acima disso).
 - A resposta é uma lista `[{ "dia": "Treino A", "foco": "Peito e Tríceps", "exercicios": "..." }]`.
 - Erros vêm como `{"detail": "mensagem"}`, e o app mostra essa mensagem ao usuário.
 
@@ -185,7 +195,7 @@ make docker-up                   # backend com hot-reload + Postgres local
 ## Testes e qualidade
 
 ```bash
-make test        # 25 testes do backend
+make test        # 37 testes do backend
 make lint        # Ruff + ESLint + TypeScript
 ```
 
@@ -202,7 +212,8 @@ do mobile, a cada push e pull request.
    - `hipertrofia-backend` — Python, `rootDir: backend`, start `alembic upgrade head && uvicorn ...`
    - `hipertrofia-web` — site estático gerado com `npx expo export -p web`
 4. Preencha no painel:
-   - backend: `DATABASE_URL`, `TREINO_API_KEY` e `ALLOWED_ORIGINS` (= URL do `hipertrofia-web`)
+   - backend: `DATABASE_URL`, `TREINO_API_KEY` e `ALLOWED_ORIGINS` (= URL do `hipertrofia-web`).
+     O `JWT_SECRET` é gerado pelo Render; se criar o serviço à mão, defina um valor longo e aleatório.
    - web: `EXPO_PUBLIC_API_BASE_URL` (= URL do `hipertrofia-backend`). O valor é embutido no
      build, então mudar a variável exige um novo deploy do site.
 5. Para os apps nativos, gere o build com EAS usando o mesmo `EXPO_PUBLIC_API_BASE_URL`.
@@ -218,8 +229,10 @@ API_Treino caso os dois usem o mesmo banco Neon.
 
 ## Limitações conhecidas
 
-- **Login apenas visual:** os botões de entrar abrem o app direto. O histórico é separado por um
-  ID anônimo gerado no aparelho; quem souber esse ID consegue ler o histórico dele.
+- **Login:** só e-mail e senha. Google, Apple e "esqueci a senha" aparecem como "em breve" — exigem
+  credenciais dos provedores e um serviço de envio de e-mail. O e-mail não é confirmado no cadastro.
+- **Dados no aparelho:** perfil, checklist e cargas ficam no aparelho (não sincronizam entre
+  aparelhos) e são apagados ao sair da conta.
 - **Coach IA:** o chat ainda responde com mensagens fixas; "Gerar treino" usa o perfil, não a conversa.
 - **NativeWind:** instalado, mas o `global.css` não é importado. As telas usam `StyleSheet`.
 - **Limites de geração em memória:** valem por instância. Com mais de uma instância no Render,

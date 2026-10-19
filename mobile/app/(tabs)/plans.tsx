@@ -8,7 +8,6 @@ import { PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
 import { Label, SectionHead } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
-import { getUserId } from "@/lib/user-id";
 import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
 
 export default function PlansScreen() {
@@ -23,7 +22,7 @@ export default function PlansScreen() {
     async function load() {
       let history: Workout[] = [];
       try {
-        history = await getWorkoutHistory(await getUserId());
+        history = await getWorkoutHistory();
       } catch {
         if (active) setOffline(true);
       }
