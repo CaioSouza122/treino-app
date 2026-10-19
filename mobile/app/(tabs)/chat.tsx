@@ -10,7 +10,6 @@ import { Label } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { defaultProfile, getProfile, type UserProfile } from "@/lib/profile";
-import { getUserId } from "@/lib/user-id";
 import { generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
 
 type Message = { id: string; from: "coach" | "user"; text: string };
@@ -58,7 +57,7 @@ export default function ChatScreen() {
     setError(null);
     try {
       const current = await getProfile();
-      const payload = { ...current, user_id: await getUserId() };
+      const payload = { ...current };
       const days = await generateWorkout(payload);
       const workout = workoutFromGeneratedDays(days, payload);
       await saveLastWorkout(workout);

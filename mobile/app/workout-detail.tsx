@@ -11,7 +11,6 @@ import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { parseSession, type Exercise, type Session } from "@/lib/parse-workout";
 import { dayKey, getLogs, lastLoadBefore, logId, removeLog, upsertLog, type ProgressLog } from "@/lib/progress";
-import { getUserId } from "@/lib/user-id";
 import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
 
 export default function WorkoutDetailScreen() {
@@ -30,7 +29,7 @@ export default function WorkoutDetailScreen() {
     async function load() {
       try {
         const local = await getLastWorkout();
-        const history = await getWorkoutHistory(await getUserId()).catch(() => []);
+        const history = await getWorkoutHistory().catch(() => []);
         const selected = history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
         const savedLogs = await getLogs();
         if (!active) return;
