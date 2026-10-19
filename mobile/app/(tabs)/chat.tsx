@@ -10,6 +10,7 @@ import { Label } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { defaultProfile, getProfile, type UserProfile } from "@/lib/profile";
+import { getUserId } from "@/lib/user-id";
 import { generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
 
 type Message = { id: string; from: "coach" | "user"; text: string };
@@ -28,8 +29,6 @@ export default function ChatScreen() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
-
-  const userId = process.env.EXPO_PUBLIC_TREINO_USER_ID || "mobile-demo-user";
 
   useFocusEffect(
     useCallback(() => {
@@ -59,7 +58,7 @@ export default function ChatScreen() {
     setError(null);
     try {
       const current = await getProfile();
-      const payload = { ...current, user_id: userId };
+      const payload = { ...current, user_id: await getUserId() };
       const days = await generateWorkout(payload);
       const workout = workoutFromGeneratedDays(days, payload);
       await saveLastWorkout(workout);

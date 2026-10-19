@@ -8,9 +8,8 @@ import { PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
 import { Label, SectionHead } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
+import { getUserId } from "@/lib/user-id";
 import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
-
-const userId = process.env.EXPO_PUBLIC_TREINO_USER_ID || "mobile-demo-user";
 
 export default function PlansScreen() {
   const router = useRouter();
@@ -24,7 +23,7 @@ export default function PlansScreen() {
     async function load() {
       let history: Workout[] = [];
       try {
-        history = await getWorkoutHistory(userId);
+        history = await getWorkoutHistory(await getUserId());
       } catch {
         if (active) setOffline(true);
       }
