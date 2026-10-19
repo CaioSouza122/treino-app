@@ -18,252 +18,227 @@
 
 ---
 
-## 📖 Sobre o Projeto
+## Sobre o projeto
 
-O **HIPERTROF.IA** é um aplicativo mobile **Full-Stack** que utiliza o **Google Gemini** para gerar protocolos de treino hiperpersonalizados. O usuário informa seus dados físicos (idade, peso, altura, objetivo, frequência semanal e tempo disponível) e a IA monta um plano de treino dividido (A, B, C...) adaptado à sua rotina. O perfil completo é enviado à IA a cada geração.
+O **HIPERTROF.IA** é um app mobile full-stack que gera planos de treino personalizados com o
+**Google Gemini**. O usuário informa idade, peso, altura, objetivo, nível, frequência semanal e
+tempo por sessão, e recebe um plano dividido em dias (Treino A, B, C...).
 
-No app, o próximo treino aparece em destaque na tela inicial, junto de gráficos de frequência e de evolução de força. O usuário marca os exercícios conforme avança e anota a carga usada em cada um.
+No app, o próximo treino aparece em destaque na tela inicial, com gráficos de frequência e de
+evolução de força. O usuário marca os exercícios conforme avança e anota a carga de cada um.
 
-Quando a API de IA está indisponível, o sistema automaticamente usa um **fallback local** inteligente baseado em templates estruturados — garantindo que o usuário sempre receba um treino.
+Se a IA estiver indisponível, o backend monta um **treino de reserva** a partir de modelos
+locais, então o usuário sempre recebe um plano.
+
+### Como as peças se ligam
+
+```
+App (Expo) ──POST /gerar-treino-ia──▶ Backend FastAPI ──POST /api/v1/treino──▶ API_Treino (Flask) ──▶ Gemini
+     ▲                                   │   (X-API-KEY)                          (repositório próprio)
+     └────── dias do treino (JSON) ──────┤
+                                         └──▶ Neon / SQLite: perfil + histórico
+```
+
+A **[API_Treino](https://github.com/CaioSouza122/API_Treino)** é um serviço separado. Ela só
+aceita chamadas com a chave `X-API-KEY`, e o backend envia o mesmo valor configurado em
+`TREINO_API_KEY`.
 
 ---
 
-## ✨ Funcionalidades
+## Funcionalidades
 
 | Funcionalidade | Status |
 |---|---|
-| 🤖 Geração de treino via IA (Google Gemini) com o perfil completo | ✅ Disponível |
-| 🔄 Fallback automático (treino local offline) | ✅ Disponível |
-| 🏋️ Próximo treino em destaque e plano da semana | ✅ Disponível |
-| ✅ Checklist de exercícios com progresso salvo no dia | ✅ Disponível |
-| 💾 Persistência de perfil (AsyncStorage) | ✅ Disponível |
-| ☁️ Histórico de treinos (PostgreSQL / Neon) | ✅ Disponível |
-| ⚙️ URL da API configurável via `.env` (`EXPO_PUBLIC_API_BASE_URL`) | ✅ Disponível |
-| 💬 Coach IA em conversa (respostas reais da IA no chat) | 🚧 Prévia: respostas ainda são fixas |
-| 🔐 Login e autenticação com JWT | 🔜 Em breve (a tela de login ainda é só visual) |
-| 📈 Registro de carga por exercício, gráficos de frequência e de evolução de força | ✅ Disponível |
-| ⏱️ Timer de descanso entre séries | 🔜 Em breve |
-| 🔔 Notificações push de lembrete | 🔜 Em breve |
+| 🤖 Geração de treino via IA com o perfil completo | ✅ |
+| 🔄 Treino de reserva local quando a IA falha | ✅ |
+| 🏋️ Próximo treino em destaque e plano da semana | ✅ |
+| ✅ Checklist de exercícios com progresso salvo no dia | ✅ |
+| 📈 Registro de carga, gráficos de frequência e de evolução de força | ✅ |
+| ☁️ Histórico de treinos no PostgreSQL (Neon), separado por aparelho | ✅ |
+| 💬 Coach IA em conversa | 🚧 Prévia: respostas ainda são fixas |
+| 🔐 Login de verdade | 🔜 A tela de login ainda é só visual |
+| ⏱️ Timer de descanso · 🔔 Lembretes | 🔜 |
 
 ---
 
-## 🏗️ Arquitetura
+## Estrutura
 
 ```
-treino-app/                  ← Monorepo
-├── backend/                 ← API REST (Python + FastAPI)
-│   ├── app/main.py          ← Entrypoint da aplicação
-│   ├── routes/              ← Endpoints HTTP
-│   ├── services/            ← Lógica de negócio + integração IA
-│   ├── models/              ← Modelos SQLAlchemy (User, Workout, WorkoutDay)
-│   ├── schemas/             ← Schemas Pydantic (validação de dados)
-│   ├── database/            ← Configuração async engine (PostgreSQL / SQLite)
-│   └── tests/               ← Testes automatizados (Pytest)
-└── mobile/                  ← App React Native (Expo)
-    ├── app/                 ← Telas (Expo Router)
-    ├── components/          ← Componentes reutilizáveis
-    ├── hooks/               ← Custom hooks
-    ├── constants/brand.ts   ← Tokens de design (cores, fontes, raios)
-    ├── lib/                 ← API, perfil, registro de treinos e cargas, utilitários
-    └── shared/              ← Tipos e constantes compartilhadas
-```
-
-**Fluxo de dados:**
-```
-App Mobile → POST /gerar-treino-ia → Backend FastAPI
-                                          ↓
-                               API Render (Gemini) ──→ Treino Gerado
-                                    (falha?)              ↓
-                                          ↓         Salvo no PostgreSQL
-                               Fallback Local              ↓
-                                          ↓         Retorna ao App
-                                    Treino Gerado
+treino-app/
+├── backend/                  # API REST (FastAPI)
+│   ├── app/main.py           # Aplicação, CORS e ciclo de vida
+│   ├── routes/treino.py      # /gerar-treino-ia e /historico/{user_id}
+│   ├── services/ia_service.py# Chamada à API_Treino, conversão em dias, treino de reserva
+│   ├── models/user.py        # Tabelas app_usuarios, app_treinos, app_treino_dias
+│   ├── schemas/              # Validação de entrada e formato de saída (Pydantic v2)
+│   ├── database/connection.py# Engine async (Neon via asyncpg ou SQLite)
+│   ├── migrations/           # Migrations versionadas (Alembic)
+│   └── tests/                # Pytest (a IA é sempre simulada)
+├── mobile/                   # App (Expo + Expo Router)
+│   ├── app/                  # Telas: início, coach, treinos, detalhe, perfil
+│   ├── components/           # Componentes de interface
+│   ├── constants/brand.ts    # Tokens de design (cores, fontes, raios)
+│   └── lib/                  # Cliente da API, perfil, ID do aparelho, progresso
+├── render.yaml               # Blueprint de deploy (backend + app web)
+├── docker-compose.yml        # Backend + Postgres local para desenvolvimento
+└── Makefile                  # Atalhos (install, backend, mobile, migrate, test, lint)
 ```
 
 ---
 
-## 🚀 Stack Tecnológica
+## Stack
+
+- **Backend:** FastAPI, SQLAlchemy 2 async, asyncpg, Alembic, Pydantic v2, httpx
+- **Mobile:** Expo, React Native, Expo Router, AsyncStorage, Chakra Petch (Expo Google Fonts)
+- **Infra:** Neon (PostgreSQL serverless), Render (backend, app web e API_Treino), Docker (opcional)
+
+---
+
+## Rodando localmente
+
+Pré-requisitos: **Python 3.12+**, **Node.js 18+**, npm e Git.
 
 ### Backend
-- **[FastAPI](https://fastapi.tiangolo.com)** — Framework web async de alta performance
-- **[SQLAlchemy 2.0](https://sqlalchemy.org)** — ORM com suporte async completo
-- **[asyncpg](https://github.com/MagicStack/asyncpg)** — Driver PostgreSQL async ultrarrápido
-- **[Pydantic v2](https://docs.pydantic.dev)** — Validação e serialização de dados
-- **[httpx](https://www.python-httpx.org)** — Cliente HTTP async para chamadas à API de IA
-- **[python-dotenv](https://github.com/theskumar/python-dotenv)** — Gerenciamento de variáveis de ambiente
-
-### Mobile
-- **[React Native](https://reactnative.dev)** + **[Expo](https://expo.dev)** — Framework mobile cross-platform
-- **[Expo Router](https://expo.github.io/router)** — Roteamento baseado em arquivos
-- **[AsyncStorage](https://react-native-async-storage.github.io/async-storage/)** — Perfil, último plano, treinos e cargas salvos no aparelho
-- **[Expo Google Fonts](https://github.com/expo/google-fonts)** — Chakra Petch (títulos e rótulos)
-
-### Infraestrutura
-- **[Neon.tech](https://neon.tech)** — PostgreSQL serverless (produção)
-- **[Render](https://render.com)** — Hospedagem da API de IA
-- **[Docker](https://docker.com)** — Containerização para desenvolvimento local
-
----
-
-## 🛠️ Como Rodar Localmente
-
-### Pré-requisitos
-
-- Python 3.12+
-- Node.js 18+
-- npm (ou pnpm)
-- Git
-
-### ⚡ Quick Start (com Make)
-
-```bash
-# Clone o repositório
-git clone https://github.com/CaioSouza122/treino-app.git
-cd treino-app
-
-# Instala todas as dependências
-make install
-
-# Terminal 1: inicia o backend
-make backend
-
-# Terminal 2: inicia o mobile (dentro de mobile/)
-make mobile
-```
-
-### 🐳 Alternativa com Docker
-
-```bash
-# Sobe o backend + PostgreSQL local
-make docker-up
-
-# Em outro terminal, inicia o mobile
-make mobile
-```
-
----
-
-### 1️⃣ Backend (FastAPI)
 
 ```bash
 cd backend
-
-# Crie e ative o ambiente virtual
 python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # Linux / Mac
+venv\Scripts\activate            # Windows
+source venv/bin/activate         # Linux / Mac
 
-# Instale as dependências
-pip install -r requirements.txt
-
-# Configure as variáveis de ambiente
-cp .env.example .env
-# Edite o .env com suas chaves
+pip install -r requirements.txt -r requirements-dev.txt
+cp .env.example .env             # preencha TREINO_API_KEY
+alembic upgrade head             # cria/atualiza as tabelas
+uvicorn app.main:app --reload --port 8000
 ```
 
-Edite o `backend/.env`:
-```env
-# Banco de dados Neon.tech (produção)
-DATABASE_URL=postgresql://usuario:senha@host.neon.tech/neondb?sslmode=require
+API em `http://localhost:8000`, documentação interativa em `http://localhost:8000/docs`.
 
-# API de IA no Render
-TREINO_API_URL=https://api-treino-ygh4.onrender.com/api/v1
-TREINO_API_KEY=sua_chave_opcional
-```
+| Variável | Obrigatória | Descrição |
+| --- | --- | --- |
+| `TREINO_API_KEY` | Sim | Mesmo valor de `API_AUTH_KEY` na API_Treino. Sem ela, toda geração cai no treino de reserva. |
+| `TREINO_API_URL` | Não | URL da API_Treino. Padrão: `https://api-treino-ygh4.onrender.com/api/v1`. |
+| `DATABASE_URL` | Não | Connection string do Neon. Vazio = SQLite local `treinoapp.db`. |
+| `ALLOWED_ORIGINS` | Não | Origens do app web para CORS, separadas por vírgula. Padrão: Expo web local (`:8081`). |
 
-> 💡 Sem `DATABASE_URL` configurada, o backend usa **SQLite local** automaticamente.
-
-Inicie o servidor:
-```bash
-uvicorn app.main:app --reload \
-  --reload-dir app --reload-dir routes --reload-dir services \
-  --reload-dir database --reload-dir models --reload-dir schemas \
-  --host 0.0.0.0 --port 8000
-```
-
-A API estará disponível em `http://localhost:8000`.
-Documentação interativa (Swagger): `http://localhost:8000/docs`
-
-### 2️⃣ Mobile (Expo)
+### Mobile
 
 ```bash
 cd mobile
 npm install
-cp .env.example .env   # aponte EXPO_PUBLIC_API_BASE_URL para o backend
-npx expo start
+cp .env.example .env             # aponte EXPO_PUBLIC_API_BASE_URL para o backend
+npx expo start                   # QR Code no Expo Go · "w" abre no navegador
 ```
 
-Escaneie o QR Code com o **Expo Go** no seu celular, ou pressione `a` para Android / `i` para iOS no simulador.
-Para abrir no navegador, use `npx expo start --web`.
+| Variável | Descrição |
+| --- | --- |
+| `EXPO_PUBLIC_API_BASE_URL` | URL do backend. No celular físico use o IP da máquina (`http://192.168.x.x:8000`), não `localhost`. |
+| `EXPO_PUBLIC_TREINO_USER_ID` | Só para desenvolvimento: força um ID fixo. Sem ela, cada aparelho gera um ID anônimo próprio. |
 
-> 💡 No celular físico, use o IP da sua máquina em `EXPO_PUBLIC_API_BASE_URL` (por exemplo, `http://192.168.1.10:8000`), não `localhost`.
-
----
-
-## 🧪 Testes
+### Com Docker
 
 ```bash
-# Executa todos os testes do backend
-make test
-
-# Ou diretamente com Pytest
-cd backend && pytest -v
-
-# Checagem de tipos do app mobile
-cd mobile && npm run type-check
+make docker-up                   # backend com hot-reload + Postgres local
 ```
 
-Os testes do backend não chamam a API de IA real: a chamada externa é simulada, então rodam rápido e sem `TREINO_API_KEY`.
+### Comandos
+
+| Comando | O que faz |
+| --- | --- |
+| `make install` | Instala dependências do backend e do mobile |
+| `make backend` / `make mobile` | Sobe o backend / o app |
+| `make migrate` | Aplica as migrations (`alembic upgrade head`) |
+| `make test` | Testes do backend |
+| `make lint` | Ruff (backend) + ESLint e TypeScript (mobile) |
+| `make format` | Formata o backend com Ruff |
 
 ---
 
-## ⚠️ Limitações Conhecidas
+## Endpoints do backend
 
-- **Login apenas visual:** os botões de entrar (e-mail, Google e Apple) abrem o app direto, e todos os usuários compartilham o ID definido em `EXPO_PUBLIC_TREINO_USER_ID`. Por isso a rota `/historico/{user_id}` não deve ser exposta publicamente até a autenticação existir.
-- **Coach IA:** o chat ainda responde com mensagens fixas e o card de plano sugerido é estático; o botão "Gerar treino" usa os dados do perfil, não o texto da conversa.
-- **API de IA externa:** o backend envia o perfil completo (altura, peso, idade, frequência e tempo), mas a API no Render precisa ler esses campos para que eles influenciem o treino.
-- **Unidade da altura:** o app guarda a altura em centímetros; o exemplo da API usa metros.
-- **NativeWind:** está instalado, mas o `global.css` não é importado, então classes `className` não têm efeito. As telas usam `StyleSheet`.
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `GET` | `/` | Health check |
+| `POST` | `/gerar-treino-ia` | Gera o treino, salva no histórico e devolve os dias |
+| `GET` | `/historico/{user_id}` | 50 treinos mais recentes daquele aparelho |
+
+`POST /gerar-treino-ia`:
+
+```json
+{
+  "user_id": "8f14e45f-...",
+  "altura": 178, "peso": 80, "idade": 28,
+  "vezes_por_semana": 4, "tempo": 60,
+  "objetivo": "hipertrofia", "nivel": "Intermediário"
+}
+```
+
+- Limites: altura 1–250, peso 20–400, idade 10–100, frequência 1–7, tempo 10–300 min,
+  objetivo 3–255 caracteres. Fora disso a resposta é `422`.
+- `nivel` aceita texto livre ("Avançado", "INICIANTE") e é convertido para o formato da API de IA.
+- No máximo 5 gerações por minuto por cliente (`429` acima disso).
+- A resposta é uma lista `[{ "dia": "Treino A", "foco": "Peito e Tríceps", "exercicios": "..." }]`.
+- Erros vêm como `{"detail": "mensagem"}`, e o app mostra essa mensagem ao usuário.
 
 ---
 
-## 🔍 Qualidade de Código
+## Testes e qualidade
 
 ```bash
-# Verificar problemas de estilo (Ruff)
-make lint
-
-# Formatar automaticamente
-make format
+make test        # 25 testes do backend
+make lint        # Ruff + ESLint + TypeScript
 ```
 
----
-
-## 🔒 Segurança
-
-- O arquivo `.env` está no `.gitignore` — **nunca commite suas chaves de API!**
-- Use o `.env.example` como referência para as variáveis necessárias.
-- O arquivo `.gitignore` protege `venv/`, `node_modules/`, `*.log` e `*.db`.
+O CI roda lint, formatação, verificação das migrations e testes do backend, além do type-check
+do mobile, a cada push e pull request.
 
 ---
 
-## 🤝 Contribuindo
+## Deploy no Render + Neon
 
-Contribuições são muito bem-vindas! Leia o [CONTRIBUTING.md](CONTRIBUTING.md) para entender o processo.
+1. **API_Treino:** faça o deploy primeiro (instruções no README dela) e anote o `API_AUTH_KEY`.
+2. **Neon:** crie o banco e copie a connection string (`postgresql://...?sslmode=require`).
+3. **Render:** *New → Blueprint* com este repositório. O `render.yaml` cria:
+   - `hipertrofia-backend` — Python, `rootDir: backend`, start `alembic upgrade head && uvicorn ...`
+   - `hipertrofia-web` — site estático gerado com `npx expo export -p web`
+4. Preencha no painel:
+   - backend: `DATABASE_URL`, `TREINO_API_KEY` e `ALLOWED_ORIGINS` (= URL do `hipertrofia-web`)
+   - web: `EXPO_PUBLIC_API_BASE_URL` (= URL do `hipertrofia-backend`). O valor é embutido no
+     build, então mudar a variável exige um novo deploy do site.
+5. Para os apps nativos, gere o build com EAS usando o mesmo `EXPO_PUBLIC_API_BASE_URL`.
+
+A migration inicial só cria as tabelas que ainda não existem, então um banco que já estava em uso
+é adotado sem perder dados. O controle de versão fica em `alembic_version_backend`, separado do da
+API_Treino caso os dois usem o mesmo banco Neon.
+
+> No plano gratuito o Render desliga serviços parados: a primeira geração depois disso pode levar
+> perto de 40s (o backend acorda, a API_Treino acorda e o Gemini responde). O app espera até 90s.
 
 ---
 
-## 📋 Changelog
+## Limitações conhecidas
 
-Veja o [CHANGELOG.md](CHANGELOG.md) para o histórico de versões.
+- **Login apenas visual:** os botões de entrar abrem o app direto. O histórico é separado por um
+  ID anônimo gerado no aparelho; quem souber esse ID consegue ler o histórico dele.
+- **Coach IA:** o chat ainda responde com mensagens fixas; "Gerar treino" usa o perfil, não a conversa.
+- **NativeWind:** instalado, mas o `global.css` não é importado. As telas usam `StyleSheet`.
+- **Limites de geração em memória:** valem por instância. Com mais de uma instância no Render,
+  é preciso movê-los para um armazenamento compartilhado (Redis).
 
 ---
 
-## 📄 Licença
+## Segurança
 
-Distribuído sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+- Segredos só em `.env` (ignorado pelo git e pelo Docker) ou no painel do Render.
+- Conexão com o Neon por TLS com certificado verificado.
+- Entradas validadas com Pydantic; banco acessado só pelo ORM.
+- CORS restrito às origens configuradas; respostas de erro sem detalhes internos.
 
 ---
+
+## Contribuindo · Changelog · Licença
+
+[CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) · [MIT](LICENSE)
 
 <div align="center">
 Feito com ❤️ e ☕ · Powered by <strong>Google Gemini</strong>

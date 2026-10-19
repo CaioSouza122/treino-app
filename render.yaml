@@ -1,0 +1,35 @@
+# Render Blueprint (https://render.com/docs/blueprint-spec) — backend FastAPI + app web estático.
+# Valores com sync: false são pedidos no painel e nunca ficam no repositório.
+services:
+  # ── Backend FastAPI ────────────────────────────────────────────────────────
+  - type: web
+    name: hipertrofia-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Aplica as migrations e sobe a API; --proxy-headers lê o IP real do cliente (limite de gerações)
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DATABASE_URL # connection string do Neon (?sslmode=require)
+        sync: false
+      - key: TREINO_API_URL
+        value: https://api-treino-ygh4.onrender.com/api/v1
+      - key: TREINO_API_KEY # mesmo valor de API_AUTH_KEY na API_Treino
+        sync: false
+      - key: ALLOWED_ORIGINS # URL do app web abaixo, ex: https://hipertrofia-web.onrender.com
+        sync: false
+
+  # ── App web (Expo export estático) ─────────────────────────────────────────
+  - type: web
+    name: hipertrofia-web
+    runtime: static
+    rootDir: mobile
+    buildCommand: npm install --legacy-peer-deps && npx expo export -p web
+    staticPublishPath: dist
+    envVars:
+      - key: EXPO_PUBLIC_API_BASE_URL # URL do backend acima, ex: https://hipertrofia-backend.onrender.com
+        sync: false

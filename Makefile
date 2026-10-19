@@ -2,9 +2,9 @@
 # Atalhos para tarefas comuns no desenvolvimento.
 # Uso: make <target>
 #
-# Requisitos: Python 3.12+, Node.js 18+, pnpm (mobile), Docker (opcional)
+# Requisitos: Python 3.12+, Node.js 18+, npm, Docker (opcional)
 
-.PHONY: help install backend mobile test lint format docker-up docker-down clean
+.PHONY: help install backend mobile migrate test lint format docker-up docker-down clean
 
 # ── Padrão: exibe ajuda ───────────────────────────────────────────────────
 help:
@@ -14,8 +14,9 @@ help:
 	@echo "  make install      Instala todas as dependências (backend + mobile)"
 	@echo "  make backend      Inicia o servidor FastAPI com hot-reload"
 	@echo "  make mobile       Inicia o app Expo"
+	@echo "  make migrate      Aplica as migrations do banco (Alembic)"
 	@echo "  make test         Executa os testes do backend"
-	@echo "  make lint         Verifica o código com Ruff"
+	@echo "  make lint         Lint do backend (Ruff) e do mobile (ESLint + tsc)"
 	@echo "  make format       Formata o código com Ruff"
 	@echo "  make docker-up    Sobe o ambiente Docker (backend + PostgreSQL)"
 	@echo "  make docker-down  Para e remove os containers Docker"
@@ -48,6 +49,11 @@ mobile:
 	@echo "📱 Iniciando app Expo..."
 	cd mobile && npx expo start
 
+# ── Banco de dados ────────────────────────────────────────────────────────
+migrate:
+	@echo "🗄️  Aplicando migrations..."
+	cd backend && alembic upgrade head
+
 # ── Testes ────────────────────────────────────────────────────────────────
 test:
 	@echo "🧪 Executando testes..."
@@ -55,8 +61,9 @@ test:
 
 # ── Qualidade de Código ───────────────────────────────────────────────────
 lint:
-	@echo "🔍 Verificando código com Ruff..."
-	cd backend && ruff check .
+	@echo "🔍 Verificando backend (Ruff) e mobile (ESLint + TypeScript)..."
+	cd backend && ruff check . && ruff format --check .
+	cd mobile && npx expo lint && npm run type-check
 
 format:
 	@echo "✨ Formatando código com Ruff..."

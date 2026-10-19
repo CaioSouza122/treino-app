@@ -23,6 +23,25 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Removido
 - Menções a exportação para Excel e URL da API configurável dentro do app, que não existem no código atual
+- Código não usado do template: fluxo OAuth/Manus, tRPC, Drizzle, `shared/` e componentes de exemplo (~1.250 linhas e 8 dependências)
+- Cache de 1 hora das gerações e a rota pública `/testar-api-flask`
+
+### Corrigido
+- 🔌 A IA nunca respondia de verdade: faltava `TREINO_API_KEY` (401) e a API_Treino recusava os campos do perfil (400); o app sempre recebia o treino de reserva
+- 👥 Todos os aparelhos usavam o mesmo `user_id` e viam o histórico uns dos outros; agora cada aparelho gera um ID anônimo
+- 🕙 Datas do histórico saíam sem fuso e o app mostrava o dia seguinte para treinos gerados à noite
+- 🧩 O texto da IA era dividido nos lugares errados (a introdução virava o foco do Treino A); 7 treinos por semana quebravam a conversão
+- 💬 O app mostra a mensagem de erro real da API em vez do JSON cru, com timeout de 90s
+
+### Segurança
+- Conexão com o Neon verifica o certificado TLS (antes usava `CERT_NONE`)
+- Validação de limites em todos os campos de entrada e limite de 5 gerações por minuto por cliente
+- CORS configurável por `ALLOWED_ORIGINS`; respostas de erro sem texto de exceções
+- `.dockerignore` impede que o `.env` entre na imagem; o Dockerfile não roda mais com `--reload`
+
+### Infra
+- Migrations versionadas com Alembic (`make migrate`) e `render.yaml` para deploy no Render
+- O CI agora falha em erros de lint/formatação e confere se as migrations batem com os models
 
 ### Em desenvolvimento
 - Autenticação de usuários com JWT
