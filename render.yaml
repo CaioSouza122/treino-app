@@ -22,6 +22,8 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS # URL do app web abaixo, ex: https://hipertrofia-web.onrender.com
         sync: false
+      - key: JWT_SECRET # assina os tokens de login; o Render gera um valor aleatório
+        generateValue: true
 
   # ── App web (Expo export estático) ─────────────────────────────────────────
   - type: web

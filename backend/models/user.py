@@ -51,3 +51,15 @@ class WorkoutDay(Base):
 
     # Relacionamento
     workout = relationship("Workout", back_populates="days")
+
+
+class Conta(Base):
+    """Credenciais de login. O id da conta é o mesmo id usado em app_usuarios e app_treinos."""
+
+    __tablename__ = "app_contas"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    nome = Column(String(80), nullable=False)
+    senha_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

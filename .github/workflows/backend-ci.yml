@@ -2,7 +2,7 @@ name: 🐍 Backend CI
 
 on:
   push:
-    branches: [main, develop, fature_1, "fature_*"]
+    branches: [main, develop, "feature/**", "fix/**"]
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
@@ -19,6 +19,18 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.12"]
+
+    # Postgres real (mesmo motor do Neon) para conferir as migrations
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
 
     defaults:
       run:
@@ -43,12 +55,15 @@ jobs:
           ruff check .
           ruff format --check .
 
-      - name: 🗄️ Migrations batem com os models
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///./ci-migrations.db"
+      - name: 🗄️ Migrations batem com os models (SQLite e Postgres)
         run: |
+          DATABASE_URL="sqlite+aiosqlite:///./ci-migrations.db" alembic upgrade head
+          DATABASE_URL="sqlite+aiosqlite:///./ci-migrations.db" alembic check
+          export DATABASE_URL="postgresql://ci:ci@localhost:5432/ci"
           alembic upgrade head
+          alembic upgrade head   # idempotente: a segunda vez não faz nada
           alembic check
+          alembic current
 
       - name: 🧪 Executar testes
         env:
