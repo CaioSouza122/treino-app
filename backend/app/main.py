@@ -1,9 +1,12 @@
+import os
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import treino
-from database.connection import engine, Base
+
 import models.user  # noqa: F401 — garante que os modelos são importados
+from database.connection import Base, engine
+from routes import treino
 
 
 @asynccontextmanager
@@ -31,16 +34,18 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
+# Origens separadas por vírgula (ex: https://hipertrofia.onrender.com).
+# Só o app web precisa disso; o app nativo não passa por CORS.
+ORIGENS_PADRAO = "http://localhost:8081,http://127.0.0.1:8081"
+origens_permitidas = [
+    origem.strip()
+    for origem in os.getenv("ALLOWED_ORIGINS", ORIGENS_PADRAO).split(",")
+    if origem.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8081",
-        "http://127.0.0.1:8081",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=origens_permitidas,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
