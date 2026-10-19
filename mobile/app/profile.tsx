@@ -55,7 +55,6 @@ export default function ProfileScreen() {
       !profile.idade ||
       !profile.vezes_por_semana ||
       !profile.tempo ||
-      !profile.objetivo ||
       !profile.nivel
     )
       return;
@@ -172,14 +171,7 @@ export default function ProfileScreen() {
               />
             </View>
 
-            <Field
-              label="Objetivo"
-              value={profile.objetivo}
-              onChangeText={(objetivo) => {
-                setProfile((current: UserProfile) => ({ ...current, objetivo }));
-                setSaved(false);
-              }}
-            />
+            {/* O objetivo é perguntado pelo Coach IA, na aba IA */}
 
             {/* ── Botão salvar ─────────────────────────────────────── */}
             <Pressable

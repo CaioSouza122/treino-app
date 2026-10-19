@@ -22,6 +22,8 @@ export type Workout = {
   id: string;
   user_id: string;
   created_at: string;
+  /** "ia" ou "reserva" (treino padrão quando a IA está indisponível). */
+  fonte?: "ia" | "reserva";
   days: WorkoutDay[];
 };
 

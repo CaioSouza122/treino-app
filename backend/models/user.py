@@ -34,6 +34,8 @@ class Workout(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     user_id = Column(String, ForeignKey("app_usuarios.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # "ia" (gerado pelo Gemini) ou "reserva" (modelo local, quando a IA está indisponível)
+    fonte = Column(String(20), nullable=False, default="ia", server_default="ia")
 
     # Relacionamentos
     user = relationship("User", back_populates="workouts")

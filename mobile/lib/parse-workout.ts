@@ -15,16 +15,18 @@ export function parseSession(day: WorkoutDay, dayIndex: number): Session {
   const lines = day.exercicios.split("\n").map((line) => line.trim()).filter(Boolean);
   const exercises = lines
     .filter((line) => !/^tempo estimado:/i.test(line))
-    .map((line, index) => {
-      const clean = line.replace(/^[-*•\d.)]+\s*/, "");
-      const match = clean.match(/^(.*?)\s*[-–—:]\s*(\d[^\n]*)$/);
-      return {
-        id: `${day.dia}-${index}`,
-        name: match?.[1]?.trim() || clean,
-        prescription: match?.[2]?.trim() || "Conforme orientação",
-        completed: false,
-      };
-    });
+    .map((line) => {
+      const marcado = /^([-*•]|\d+[.)])\s+/.test(line);
+      const clean = line.replace(/^([-*•]|\d+[.)])\s+/, "");
+      // Separador " — 4x10" ou ": 3x12" (exige espaço em volta do traço para não cortar "30-45s")
+      const match = clean.match(/^(.*?)\s+[-–—]\s+(\d.*)$/) ?? clean.match(/^(.*?):\s*(\d.*)$/);
+      // Linha sem marcador de lista e sem prescrição é anotação ("Descanso de 60s", "PROTOCOLO: ..."),
+      // não exercício
+      if (!marcado && !match) return null;
+      return { name: match?.[1]?.trim() || clean, prescription: match?.[2]?.trim() || "Conforme orientação" };
+    })
+    .filter((item): item is { name: string; prescription: string } => item !== null)
+    .map((item, index) => ({ id: `${day.dia}-${index}`, ...item, completed: false }));
 
   const minutesText = day.exercicios.match(/Tempo estimado:\s*(\d+)/i)?.[1];
   const minutes = minutesText ? Number(minutesText) : null;

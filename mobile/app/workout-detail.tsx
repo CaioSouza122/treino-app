@@ -144,9 +144,19 @@ export default function WorkoutDetailScreen() {
       <View style={styles.fill}>
         <ScreenHeader
           title={sessions[0]?.subtitle || "Treino personalizado"}
-          subtitle={`Gerado pela IA · ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`}
+          subtitle={`${workout.fonte === "reserva" ? "Treino padrão" : "Gerado pela IA"} · ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`}
         />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* A IA estava fora do ar: avisa em vez de fingir que o plano é personalizado */}
+          {workout.fonte === "reserva" && (
+            <View style={styles.reserva}>
+              <MaterialIcons name="cloud-off" size={18} color={brand.cyan} />
+              <Text style={styles.reservaTexto}>
+                A IA estava indisponível, então montamos um treino padrão para o seu objetivo. Gere de novo em
+                alguns minutos para receber o plano personalizado.
+              </Text>
+            </View>
+          )}
           {/* ── Resumo ─────────────────────────────────────────────── */}
           <View style={styles.summary}>
             <Summary value={String(sessions.length)} unit="dias" />
@@ -317,6 +327,8 @@ function ExerciseRow({
 }
 
 const styles = StyleSheet.create({
+  reserva: { alignItems: "flex-start", backgroundColor: brand.cyanSoft, borderColor: brand.cyan, borderRadius: radius.md, borderWidth: 1, flexDirection: "row", gap: 10, padding: 14 },
+  reservaTexto: { color: brand.text, flex: 1, fontSize: 13, lineHeight: 19 },
   fill: { flex: 1 },
   center: { alignItems: "center", flex: 1, justifyContent: "center", padding: 24 },
   message: { ...type.caption, fontSize: 15, textAlign: "center" },

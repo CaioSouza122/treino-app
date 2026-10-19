@@ -9,22 +9,33 @@ import { ScreenContainer } from "@/components/screen-container";
 import { Label } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
-import { defaultProfile, getProfile, type UserProfile } from "@/lib/profile";
+import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
+import { getUsuario } from "@/lib/session";
 import { generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
 
 type Message = { id: string; from: "coach" | "user"; text: string };
 
-const greeting: Message = {
-  id: "greeting",
-  from: "coach",
-  text: "Conte seu objetivo, nível e qualquer limitação. Quando estiver pronto, gere o plano com base no seu perfil.",
-};
+// Atalhos da pergunta de apresentação; o usuário também pode escrever com as próprias palavras
+const OBJETIVOS = ["Hipertrofia", "Emagrecimento", "Força", "Condicionamento", "Resistência"] as const;
+
+function saudacao(nome: string | null): Message {
+  const primeiroNome = nome?.trim().split(" ")[0];
+  return {
+    id: "greeting",
+    from: "coach",
+    text:
+      (primeiroNome ? `Olá, ${primeiroNome}! ` : "Olá! ") +
+      "Qual é o seu objetivo com o treino? Escolha uma opção ou escreva com suas palavras — por exemplo, “perder barriga e ganhar fôlego”.",
+  };
+}
 
 export default function ChatScreen() {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([greeting]);
+  const [messages, setMessages] = useState<Message[]>([saudacao(null)]);
   const [input, setInput] = useState("");
   const [profile, setProfile] = useState<UserProfile>(defaultProfile);
+  // Objetivo respondido nesta conversa; o cartão do plano só aparece depois da resposta
+  const [objetivo, setObjetivo] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -32,32 +43,52 @@ export default function ChatScreen() {
   useFocusEffect(
     useCallback(() => {
       getProfile().then(setProfile).catch(() => setProfile(defaultProfile));
+      getUsuario()
+        .then((usuario) => setMessages((atuais) => (atuais.length === 1 ? [saudacao(usuario?.nome ?? null)] : atuais)))
+        .catch(() => {});
     }, []),
   );
 
-  function send() {
-    const text = input.trim();
-    if (!text) return;
+  async function responder(texto: string) {
+    const resposta = texto.trim();
+    if (!resposta) return;
     haptic.light();
+    setInput("");
+    setError(null);
     const stamp = Date.now();
-    setMessages((current) => [
-      ...current,
-      { id: String(stamp), from: "user", text },
+    const doUsuario: Message = { id: String(stamp), from: "user", text: resposta };
+
+    if (resposta.length < 3) {
+      setMessages((atuais) => [
+        ...atuais,
+        doUsuario,
+        { id: String(stamp + 1), from: "coach", text: "Me conte um pouco mais — por exemplo, “emagrecer” ou “ganhar massa”." },
+      ]);
+      return;
+    }
+
+    setObjetivo(resposta);
+    // Salva no perfil para a tela inicial e para a próxima geração
+    const atualizado = { ...(await getProfile()), objetivo: resposta };
+    await saveProfile(atualizado);
+    setProfile(atualizado);
+    setMessages((atuais) => [
+      ...atuais,
+      doUsuario,
       {
         id: String(stamp + 1),
         from: "coach",
-        text: "Entendido. Quando estiver pronto, gere o plano abaixo para consultar o treino real.",
+        text: `Fechado: treino com foco em “${resposta}”. Confira seus dados abaixo e toque em Gerar treino. Para mudar o objetivo, é só escrever outro.`,
       },
     ]);
-    setInput("");
   }
 
   async function generate() {
+    if (!objetivo) return;
     setGenerating(true);
     setError(null);
     try {
-      const current = await getProfile();
-      const payload = { ...current };
+      const payload = { ...(await getProfile()), objetivo };
       const days = await generateWorkout(payload);
       const workout = workoutFromGeneratedDays(days, payload);
       await saveLastWorkout(workout);
@@ -88,6 +119,7 @@ export default function ChatScreen() {
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.messages}
+          keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           showsVerticalScrollIndicator={false}
         >
@@ -95,42 +127,67 @@ export default function ChatScreen() {
             <MessageBubble key={message.id} message={message} />
           ))}
 
-          {/* ── Plano a gerar (dados reais do perfil) ──────────────── */}
-          <View style={styles.planCard}>
-            <Label color={brand.lime}>Plano a gerar</Label>
-            <Text style={styles.planTitle}>{profile.objetivo}</Text>
-            <View style={styles.planGrid}>
-              <PlanItem label="Dias" value={`${profile.vezes_por_semana}x por semana`} />
-              <PlanItem label="Duração" value={`${profile.tempo} min`} />
-              <PlanItem label="Nível" value={capitalize(profile.nivel)} />
-            </View>
-            {error && <Text style={styles.error}>{error}</Text>}
-            <PrimaryButton
-              label={generating ? "Gerando…" : "Gerar treino"}
-              onPress={generate}
-              disabled={generating}
-              icon={<MaterialIcons name="auto-awesome" size={18} color={brand.onLime} />}
-              style={styles.planButton}
-            />
-            <Pressable onPress={() => router.push("/profile" as never)} style={styles.editLink}>
-              <Text style={styles.editLinkText}>Ajustar dados do perfil</Text>
-            </Pressable>
+          {/* ── Respostas rápidas para a pergunta de objetivo ──────── */}
+          <View style={styles.chips}>
+            {OBJETIVOS.map((opcao) => {
+              const ativo = objetivo === opcao;
+              return (
+                <Pressable
+                  key={opcao}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: ativo }}
+                  onPress={() => responder(opcao)}
+                  style={({ pressed }) => [styles.chip, ativo && styles.chipOn, pressed && styles.pressed]}
+                >
+                  <Text style={[styles.chipText, ativo && styles.chipTextOn]}>{opcao}</Text>
+                </Pressable>
+              );
+            })}
           </View>
+
+          {/* ── Plano a gerar (objetivo da conversa + dados do perfil) ── */}
+          {objetivo && (
+            <View style={styles.planCard}>
+              <Label color={brand.lime}>Plano a gerar</Label>
+              <Text style={styles.planTitle}>{objetivo}</Text>
+              <View style={styles.planGrid}>
+                <PlanItem label="Dias" value={`${profile.vezes_por_semana}x por semana`} />
+                <PlanItem label="Duração" value={`${profile.tempo} min`} />
+                <PlanItem label="Nível" value={capitalize(profile.nivel)} />
+              </View>
+              {error && <Text style={styles.error}>{error}</Text>}
+              <PrimaryButton
+                label={generating ? "Gerando…" : "Gerar treino"}
+                onPress={generate}
+                disabled={generating}
+                icon={<MaterialIcons name="auto-awesome" size={18} color={brand.onLime} />}
+                style={styles.planButton}
+              />
+              <Pressable onPress={() => router.push("/profile" as never)} style={styles.editLink}>
+                <Text style={styles.editLinkText}>Ajustar dias, tempo e nível no perfil</Text>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
 
         {/* ── Campo de mensagem ────────────────────────────────────── */}
         <View style={styles.composer}>
           <TextInput
             accessibilityLabel="Mensagem"
+            maxLength={255}
             value={input}
             onChangeText={setInput}
-            onSubmitEditing={send}
-            placeholder="Escreva para o treinador…"
+            onSubmitEditing={() => responder(input)}
+            placeholder={objetivo ? "Escreva outro objetivo…" : "Escreva seu objetivo…"}
             placeholderTextColor={brand.dim}
             returnKeyType="send"
             style={styles.composerInput}
           />
-          <Pressable accessibilityLabel="Enviar mensagem" onPress={send} style={({ pressed }) => [styles.send, pressed && styles.pressed]}>
+          <Pressable
+            accessibilityLabel="Enviar mensagem"
+            onPress={() => responder(input)}
+            style={({ pressed }) => [styles.send, pressed && styles.pressed]}
+          >
             <MaterialIcons name="arrow-upward" color={brand.onLime} size={20} />
           </Pressable>
         </View>
@@ -178,7 +235,12 @@ const styles = StyleSheet.create({
   bubbleText: { color: brand.text, fontSize: 14.5, lineHeight: 21 },
   userText: { color: brand.text },
   planCard: { backgroundColor: brand.surface, borderColor: brand.borderStrong, borderRadius: radius.lg, borderWidth: 1, gap: 12, marginTop: 8, padding: 18 },
-  planTitle: { ...type.h2, fontSize: 24, lineHeight: 29, textTransform: "capitalize" },
+  planTitle: { ...type.h2, fontSize: 24, lineHeight: 29 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { borderColor: brand.borderStrong, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+  chipOn: { backgroundColor: brand.limeSoft, borderColor: brand.lime },
+  chipText: { color: brand.text, fontFamily: font.displayMedium, fontSize: 13 },
+  chipTextOn: { color: brand.lime },
   planGrid: { flexDirection: "row", gap: 8 },
   planItem: { borderColor: brand.border, borderRadius: radius.sm, borderWidth: 1, flex: 1, gap: 3, padding: 10 },
   planItemLabel: { ...type.label, fontSize: 9 },

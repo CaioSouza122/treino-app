@@ -58,6 +58,7 @@ class WorkoutResponse(BaseModel):
     id: str
     user_id: str
     created_at: datetime
+    fonte: str = "ia"
     days: list[WorkoutDayResponse]
 
     model_config = ConfigDict(from_attributes=True)
