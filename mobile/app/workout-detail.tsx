@@ -1,4 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -9,6 +10,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { Label, TraceProgress } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
+import { preferencias } from "@/lib/preferences";
 import { parseSession, type Exercise, type Session } from "@/lib/parse-workout";
 import { dayKey, getLogs, lastLoadBefore, logId, removeLog, upsertLog, type ProgressLog } from "@/lib/progress";
 import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
@@ -23,6 +25,16 @@ export default function WorkoutDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const today = dayKey();
+
+  // Na academia o celular fica parado entre as séries: mantém a tela acesa (Configurações)
+  useEffect(() => {
+    if (!preferencias().telaLigada) return;
+    const tag = "treino-aberto";
+    activateKeepAwakeAsync(tag).catch(() => {});
+    return () => {
+      void deactivateKeepAwake(tag);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
