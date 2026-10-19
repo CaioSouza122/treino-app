@@ -35,7 +35,7 @@ async def gerar_treino(
 
     # 1. Gera o treino via IA ou fallback local
     try:
-        resultado = await gerar_treino_ia(dados)
+        resultado, fonte = await gerar_treino_ia(dados)
     except Exception as e:
         print(f"[ERRO] Falha ao gerar treino: {type(e).__name__}: {e}")
         resultado = None
@@ -78,7 +78,7 @@ async def gerar_treino(
             await db.flush()
 
         # Cria a sessão de Treino
-        novo_treino = Workout(user_id=usuario.id)
+        novo_treino = Workout(user_id=usuario.id, fonte=fonte)
         db.add(novo_treino)
         await db.flush()
 

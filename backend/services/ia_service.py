@@ -1,5 +1,6 @@
 import os
 import re
+import unicodedata
 
 import httpx
 
@@ -13,23 +14,44 @@ TREINO_API_URL = os.getenv("TREINO_API_URL", "https://api-treino-ygh4.onrender.c
 TREINO_API_KEY = os.getenv("TREINO_API_KEY", "")
 
 
-async def gerar_treino_ia(dados):
+async def gerar_treino_ia(dados) -> tuple[list, str]:
     """
     Gera treino personalizado chamando a API no Render (que usa o Gemini internamente).
     Faz fallback local caso a API esteja inacessível. Sem cache: "gerar de novo" deve
     trazer um treino novo, e um fallback não pode ficar preso enquanto a IA já voltou.
+
+    Devolve (dias, fonte), com fonte "ia" ou "reserva", para o app avisar quando o
+    treino veio dos modelos locais.
     """
     try:
         resposta = await _chamar_api_externa(dados)
         if resposta:
-            return resposta
+            return resposta, "ia"
 
         print("[INFO] API externa indisponivel - usando engine de fallback local.")
-        return _gerar_treino_local(dados)
-
     except Exception as e:
         print(f"[ERRO] Erro geral ao gerar treino: {e}")
-        return _gerar_treino_local(dados)
+    return _gerar_treino_local(dados), "reserva"
+
+
+# Palavras que identificam cada objetivo no texto livre do usuário (sem acento, minúsculo)
+_PALAVRAS_OBJETIVO = (
+    ("emagrecimento", ("emagrec", "perder peso", "perda de peso", "gordura", "secar", "definir")),
+    ("forca", ("forca",)),
+    ("resistencia", ("resist",)),
+    ("condicionamento", ("condicion", "cardio", "folego")),
+    ("hipertrofia", ("hipertrof", "massa", "musculo", "crescer")),
+)
+
+
+def classificar_objetivo(texto: str | None) -> str:
+    """'Quero emagrecer' -> 'emagrecimento'; texto sem palavra conhecida -> o próprio texto."""
+    bruto = (texto or "hipertrofia").strip()
+    normal = unicodedata.normalize("NFKD", bruto).encode("ascii", "ignore").decode().lower()
+    for objetivo, palavras in _PALAVRAS_OBJETIVO:
+        if any(palavra in normal for palavra in palavras):
+            return objetivo
+    return bruto.lower()
 
 
 def _gerar_treino_local(dados) -> list:
@@ -37,7 +59,7 @@ def _gerar_treino_local(dados) -> list:
     Gera um treino estruturado localmente sem depender de API externa.
     Usa templates baseados no objetivo, nível e frequência do usuário.
     """
-    objetivo = (dados.objetivo or "hipertrofia").lower()
+    objetivo = classificar_objetivo(dados.objetivo)
     frequencia = dados.vezes_por_semana or 4
     tempo = dados.tempo or 60
 

@@ -78,7 +78,7 @@ async def test_gerar_treino_usa_resposta_da_api(monkeypatch):
         return dias
 
     monkeypatch.setattr(ia_service, "_chamar_api_externa", online)
-    assert await ia_service.gerar_treino_ia(TreinoRequest(**PAYLOAD)) == dias
+    assert await ia_service.gerar_treino_ia(TreinoRequest(**PAYLOAD)) == (dias, "ia")
 
 
 @pytest.mark.asyncio
