@@ -10,9 +10,6 @@
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "@shared/*": [
-        "./shared/*"
       ]
     }
   },
@@ -25,9 +22,6 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "drizzle.config.ts",
-    "lib/trpc.ts",
-    "shared/types.ts"
+    "dist"
   ]
 }
