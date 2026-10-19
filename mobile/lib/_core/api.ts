@@ -7,6 +7,17 @@ type ApiResponse<T> = {
   error?: string;
 };
 
+// FastAPI responde { detail: string | [{ msg }] }; a API Flask responde { erro } ou { erros_validacao }.
+function extractErrorMessage(body: any): string | null {
+  if (!body || typeof body !== "object") return null;
+  const { detail } = body;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((item) => item?.msg).filter(Boolean).join("; ") || null;
+  }
+  return body.erro || body.error || body.mensagem || body.message || null;
+}
+
 export async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -62,12 +73,11 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
       console.error("[API] Error response:", errorText);
       let errorMessage = errorText;
       try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error || errorJson.message || errorText;
+        errorMessage = extractErrorMessage(JSON.parse(errorText)) || errorText;
       } catch {
         // Not JSON, use text as is
       }
-      throw new Error(errorMessage || `API call failed: ${response.statusText}`);
+      throw new Error(errorMessage || `Erro ${response.status} ao chamar a API.`);
     }
 
     const contentType = response.headers.get("content-type");
@@ -82,6 +92,10 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
     return (text ? JSON.parse(text) : {}) as T;
   } catch (error) {
     console.error("[API] Request failed:", error);
+    // fetch rejeita com TypeError quando não alcança o servidor (URL errada, offline, CORS)
+    if (error instanceof TypeError) {
+      throw new Error(`Não foi possível conectar à API em ${baseUrl || "(EXPO_PUBLIC_API_BASE_URL vazia)"}.`);
+    }
     if (error instanceof Error) {
       throw error;
     }
