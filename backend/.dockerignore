@@ -1,0 +1,9 @@
+# Nunca colocar segredos ou estado local dentro da imagem
+.env
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.db
+tests/

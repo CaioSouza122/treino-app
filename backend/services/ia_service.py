@@ -1,8 +1,8 @@
 import os
 import re
-import hashlib
+
 import httpx
-from datetime import datetime, timedelta
+
 # pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
@@ -12,36 +12,20 @@ load_dotenv()
 TREINO_API_URL = os.getenv("TREINO_API_URL", "https://api-treino-ygh4.onrender.com/api/v1")
 TREINO_API_KEY = os.getenv("TREINO_API_KEY", "")
 
-# Cache simples para evitar chamadas repetidas (1 hora)
-_cache = {}
-_cache_tempo = {}
-
 
 async def gerar_treino_ia(dados):
     """
     Gera treino personalizado chamando a API no Render (que usa o Gemini internamente).
-    Faz fallback local caso a API esteja inacessível.
+    Faz fallback local caso a API esteja inacessível. Sem cache: "gerar de novo" deve
+    trazer um treino novo, e um fallback não pode ficar preso enquanto a IA já voltou.
     """
     try:
-        chave = hashlib.md5(str(dados.__dict__).encode()).hexdigest()
-
-        if chave in _cache and datetime.now() < _cache_tempo.get(chave, datetime.min):
-            print("[CACHE] Usando resposta do cache")
-            return _cache[chave]
-
         resposta = await _chamar_api_externa(dados)
-
         if resposta:
-            _cache[chave] = resposta
-            _cache_tempo[chave] = datetime.now() + timedelta(hours=1)
             return resposta
 
         print("[INFO] API externa indisponivel - usando engine de fallback local.")
-        resposta = _gerar_treino_local(dados)
-        if resposta:
-            _cache[chave] = resposta
-            _cache_tempo[chave] = datetime.now() + timedelta(hours=1)
-        return resposta
+        return _gerar_treino_local(dados)
 
     except Exception as e:
         print(f"[ERRO] Erro geral ao gerar treino: {e}")
@@ -54,7 +38,6 @@ def _gerar_treino_local(dados) -> list:
     Usa templates baseados no objetivo, nível e frequência do usuário.
     """
     objetivo = (dados.objetivo or "hipertrofia").lower()
-    nivel = (dados.nivel or "intermediario").lower()
     frequencia = dados.vezes_por_semana or 4
     tempo = dados.tempo or 60
 
@@ -111,13 +94,25 @@ def _gerar_treino_local(dados) -> list:
     # Estrutura de divisões por frequência
     divisoes = {
         2: [
-            {"dia": "Treino A", "foco": "Corpo Todo (Empurrar)", "grupos": ["peito", "ombros", "triceps", "core"]},
-            {"dia": "Treino B", "foco": "Corpo Todo (Puxar + Pernas)", "grupos": ["costas", "biceps", "pernas", "gluteos"]},
+            {
+                "dia": "Treino A",
+                "foco": "Corpo Todo (Empurrar)",
+                "grupos": ["peito", "ombros", "triceps", "core"],
+            },
+            {
+                "dia": "Treino B",
+                "foco": "Corpo Todo (Puxar + Pernas)",
+                "grupos": ["costas", "biceps", "pernas", "gluteos"],
+            },
         ],
         3: [
             {"dia": "Treino A", "foco": "Peito e Tríceps", "grupos": ["peito", "triceps", "core"]},
             {"dia": "Treino B", "foco": "Costas e Bíceps", "grupos": ["costas", "biceps"]},
-            {"dia": "Treino C", "foco": "Pernas e Glúteos", "grupos": ["pernas", "gluteos", "core"]},
+            {
+                "dia": "Treino C",
+                "foco": "Pernas e Glúteos",
+                "grupos": ["pernas", "gluteos", "core"],
+            },
         ],
         4: [
             {"dia": "Treino A", "foco": "Peito e Tríceps", "grupos": ["peito", "triceps"]},
@@ -130,7 +125,11 @@ def _gerar_treino_local(dados) -> list:
             {"dia": "Treino B", "foco": "Costas", "grupos": ["costas"]},
             {"dia": "Treino C", "foco": "Pernas", "grupos": ["pernas"]},
             {"dia": "Treino D", "foco": "Ombros e Bíceps", "grupos": ["ombros", "biceps"]},
-            {"dia": "Treino E", "foco": "Glúteos e Tríceps", "grupos": ["gluteos", "triceps", "core"]},
+            {
+                "dia": "Treino E",
+                "foco": "Glúteos e Tríceps",
+                "grupos": ["gluteos", "triceps", "core"],
+            },
         ],
         6: [
             {"dia": "Treino A", "foco": "Peito e Tríceps", "grupos": ["peito", "triceps"]},
@@ -153,7 +152,9 @@ def _gerar_treino_local(dados) -> list:
         "resistencia": "Foco em resistência: repetições altas (15-20), intervalos curtos.",
         "condicionamento": "Foco em condicionamento: combinar exercícios compostos e aeróbicos.",
     }
-    obs = obs_objetivo.get(objetivo, f"Objetivo: {objetivo.capitalize()}. Progrida as cargas semanalmente.")
+    obs = obs_objetivo.get(
+        objetivo, f"Objetivo: {objetivo.capitalize()}. Progrida as cargas semanalmente."
+    )
 
     resultado = []
     for bloco in template:
@@ -165,11 +166,13 @@ def _gerar_treino_local(dados) -> list:
                 linhas.extend(f"  - {ex}" for ex in exercs)
                 linhas.append("")
         linhas.append(f"Tempo estimado: {tempo} min")
-        resultado.append({
-            "dia": bloco["dia"],
-            "foco": bloco["foco"],
-            "exercicios": "\n".join(linhas).strip(),
-        })
+        resultado.append(
+            {
+                "dia": bloco["dia"],
+                "foco": bloco["foco"],
+                "exercicios": "\n".join(linhas).strip(),
+            }
+        )
 
     print(f"[OK] Treino local gerado com {len(resultado)} dias (fallback)")
     return resultado
@@ -212,11 +215,11 @@ async def _chamar_api_externa(dados):
         print(f"[INFO] Status da API Externa: {response.status_code}")
 
         if response.status_code == 401:
-            print(f"[WARN] Erro de autenticação! Verifique TREINO_API_KEY no .env")
+            print("[WARN] Erro de autenticação! Verifique TREINO_API_KEY no .env")
             return None
 
         if response.status_code == 429:
-            print(f"[WARN] Rate limit atingido na API externa. Aguarde.")
+            print("[WARN] Rate limit atingido na API externa. Aguarde.")
             return None
 
         response.raise_for_status()
@@ -244,105 +247,54 @@ async def _chamar_api_externa(dados):
         return None
 
 
+# Cabeçalho de cada dia: "Treino A: Peito", "**Treino B - Costas**", "### Dia 3: Pernas"
+_CABECALHO_DIA = re.compile(
+    r"^[#*\s]*(?:Treino\s+[A-G]|Dia\s+\d)\b[^\n]*$", re.IGNORECASE | re.MULTILINE
+)
+_LETRAS = "ABCDEFG"
 
-async def testar_conexao_flask():
-    """
-    Testa a conexão com a API no Render e retorna um diagnóstico detalhado.
-    """
-    url = f"{TREINO_API_URL}/health"
-    chave_api = TREINO_API_KEY
-    resultado = {
-        "url_configurada": TREINO_API_URL,
-        "api_key_configurada": bool(chave_api),
-        "health_check": None,
-        "teste_treino": None,
-        "erro": None,
-    }
 
-    try:
-        headers = {}
-        if chave_api:
-            headers["X-API-KEY"] = chave_api
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            # Testa o health check
-            try:
-                r = await client.get(url, headers=headers)
-                resultado["health_check"] = {
-                    "status_code": r.status_code,
-                    "resposta": r.json() if r.status_code == 200 else r.text,
-                }
-            except Exception as e:
-                resultado["health_check"] = {"erro": str(e)}
-
-            # Testa criação de treino
-            try:
-                r2 = await client.post(
-                    f"{TREINO_API_URL}/treino",
-                    json={"objetivo": "hipertrofia", "nivel": "iniciante"},
-                    headers={**headers, "Content-Type": "application/json"},
-                )
-                resultado["teste_treino"] = {
-                    "status_code": r2.status_code,
-                    "campos_retornados": list(r2.json().keys()) if r2.status_code in (200, 201) else r2.text,
-                }
-            except Exception as e:
-                resultado["teste_treino"] = {"erro": str(e)}
-
-    except Exception as e:
-        resultado["erro"] = str(e)
-
-    return resultado
+def _limpar_foco(cabecalho: str) -> str:
+    """'**Treino A: Peito e Tríceps**' -> 'Peito e Tríceps'."""
+    texto = cabecalho.strip().strip("#*").strip()
+    partes = re.split(r"\s*[:–—]\s*|\s+-\s+", texto, maxsplit=1)
+    return partes[-1].strip().strip("*").strip() if len(partes) == 2 else ""
 
 
 def _converter_texto_para_dias(treino_texto: str, dados) -> list:
     """
     Converte o texto livre retornado pela API para o formato de array de dias
-    que o app mobile espera: [{ "dia", "foco", "exercicios" }]
+    que o app mobile espera: [{ "dia", "foco", "exercicios" }].
+    Divide só nas linhas de cabeçalho de dia; o texto antes do primeiro dia (introdução) é descartado.
     """
-    frequencia = dados.vezes_por_semana or 3
+    frequencia = min(dados.vezes_por_semana or 3, len(_LETRAS))
     objetivo = dados.objetivo or "Treino"
     nivel = dados.nivel or "intermediario"
     tempo = dados.tempo or 30
-    letras = ['A', 'B', 'C', 'D', 'E', 'F']
+    foco_padrao = f"{objetivo.capitalize()} ({nivel.capitalize()})"
+    rodape = f"\n\nTempo estimado: {tempo} min"
 
-    blocos = re.split(r'\n(?=(?:Treino\s+[A-F]|Dia\s+\d|#{1,3}\s))', treino_texto, flags=re.IGNORECASE)
-
-    if len(blocos) >= 2:
-        dias = []
-        for i, bloco in enumerate(blocos[:frequencia]):
-            bloco = bloco.strip()
-            if not bloco:
-                continue
-            linhas = bloco.split('\n')
-            foco_linha = linhas[0].strip().lstrip('#').strip() if linhas else f"{objetivo} - Dia {letras[i]}"
-            exercicios = '\n'.join(l for l in linhas[1:] if l.strip())
-            exercicios += f"\n\nTempo estimado: {tempo} min"
-            dias.append({
-                "dia": f"Treino {letras[i]}",
-                "foco": foco_linha or f"{objetivo.capitalize()} ({nivel.capitalize()})",
-                "exercicios": exercicios,
-            })
-        while len(dias) < frequencia:
-            i = len(dias)
-            dias.append({
-                "dia": f"Treino {letras[i]}",
-                "foco": f"{objetivo.capitalize()} ({nivel.capitalize()})",
-                "exercicios": treino_texto.strip() + f"\n\nTempo estimado: {tempo} min",
-            })
-        return dias
-    else:
-        exercicios_formatados = treino_texto.strip() + f"\n\nTempo estimado: {tempo} min"
-        return [
+    cabecalhos = list(_CABECALHO_DIA.finditer(treino_texto))
+    dias = []
+    for i, cabecalho in enumerate(cabecalhos[:frequencia]):
+        fim = cabecalhos[i + 1].start() if i + 1 < len(cabecalhos) else len(treino_texto)
+        corpo = treino_texto[cabecalho.end() : fim]
+        exercicios = "\n".join(linha for linha in corpo.splitlines() if linha.strip())
+        dias.append(
             {
-                "dia": f"Treino {letras[i]}",
-                "foco": f"{objetivo.capitalize()} ({nivel.capitalize()})",
-                "exercicios": exercicios_formatados,
+                "dia": f"Treino {_LETRAS[i]}",
+                "foco": _limpar_foco(cabecalho.group()) or foco_padrao,
+                "exercicios": exercicios + rodape,
             }
-            for i in range(frequencia)
-        ]
+        )
 
-
-def processar_resposta_ia(resposta):
-    """Mantida para compatibilidade."""
-    return resposta
+    # Sem cabeçalhos (ou menos dias que o pedido): repete o texto inteiro nos dias que faltam
+    while len(dias) < frequencia:
+        dias.append(
+            {
+                "dia": f"Treino {_LETRAS[len(dias)]}",
+                "foco": foco_padrao,
+                "exercicios": treino_texto.strip() + rodape,
+            }
+        )
+    return dias

@@ -1,6 +1,8 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from app.main import app
+from routes import treino as treino_routes
 from schemas.treino_schema import TreinoRequest
 from services import ia_service
 
@@ -26,16 +28,13 @@ def api_externa_offline(monkeypatch):
         return None
 
     monkeypatch.setattr(ia_service, "_chamar_api_externa", offline)
-    ia_service._cache.clear()
-    ia_service._cache_tempo.clear()
+    treino_routes._geracoes_por_cliente.clear()
 
 
 @pytest.mark.asyncio
 async def test_home():
     """Verifica que a rota raiz retorna status 200."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/")
     assert response.status_code == 200
     assert "message" in response.json()
@@ -44,9 +43,7 @@ async def test_home():
 @pytest.mark.asyncio
 async def test_gerar_treino_payload_invalido():
     """Verifica que dados incompletos retornam 422 (Unprocessable Entity)."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post("/gerar-treino-ia", json={})
     assert response.status_code == 422
 
@@ -54,9 +51,7 @@ async def test_gerar_treino_payload_invalido():
 @pytest.mark.asyncio
 async def test_gerar_treino_basico():
     """Verifica que um request válido retorna uma lista de treinos (via fallback local)."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post("/gerar-treino-ia", json=PAYLOAD)
     assert response.status_code == 200
     data = response.json()

@@ -1,8 +1,10 @@
 import os
 import ssl
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import declarative_base
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
+
 from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import declarative_base
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -20,13 +22,15 @@ if DATABASE_URL:
     elif DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 
-    # O asyncpg não aceita '?sslmode=require' na URL — remove e configura via connect_args
-    if "sslmode=require" in DATABASE_URL:
-        DATABASE_URL = DATABASE_URL.replace("?sslmode=require", "").replace("&sslmode=require", "")
-        ssl_ctx = ssl.create_default_context()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = ssl.CERT_NONE
-        connect_args["ssl"] = ssl_ctx
+    # O asyncpg não aceita 'sslmode' nem 'channel_binding' (que o Neon põe na URL):
+    # remove da query string e liga o SSL via connect_args, verificando o certificado.
+    partes = urlsplit(DATABASE_URL)
+    query = parse_qs(partes.query)
+    sslmode = query.pop("sslmode", [None])[0]
+    query.pop("channel_binding", None)
+    DATABASE_URL = urlunsplit(partes._replace(query=urlencode(query, doseq=True)))
+    if sslmode and sslmode != "disable":
+        connect_args["ssl"] = ssl.create_default_context()
 
 else:
     # Fallback SQLite para desenvolvimento local sem banco configurado
@@ -38,15 +42,14 @@ engine = create_async_engine(
     connect_args=connect_args,
     echo=False,
     future=True,
+    # O Neon fecha conexões ociosas: testa cada conexão do pool antes de reutilizar
+    pool_pre_ping=True,
 )
 
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 Base = declarative_base()
+
 
 # Dependência do FastAPI para obter a sessão do BD
 async def get_db():

@@ -24,14 +24,6 @@ COPY . .
 # Expõe a porta da API
 EXPOSE 8000
 
-# Comando para iniciar o servidor
-CMD ["uvicorn", "app.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--reload", \
-     "--reload-dir", "app", \
-     "--reload-dir", "routes", \
-     "--reload-dir", "services", \
-     "--reload-dir", "database", \
-     "--reload-dir", "models", \
-     "--reload-dir", "schemas"]
+# Comando de produção. O Render define $PORT; --proxy-headers faz o uvicorn ler o IP real
+# do cliente no X-Forwarded-For (usado pelo limite de gerações). Hot-reload: docker-compose.yml.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips "*"

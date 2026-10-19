@@ -1,11 +1,15 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
-from database.connection import Base
-from datetime import datetime
 import uuid
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
+from database.connection import Base
+
 
 def generate_uuid():
     return str(uuid.uuid4())
+
 
 class User(Base):
     __tablename__ = "app_usuarios"
@@ -23,6 +27,7 @@ class User(Base):
     # Relacionamento
     workouts = relationship("Workout", back_populates="user", cascade="all, delete-orphan")
 
+
 class Workout(Base):
     __tablename__ = "app_treinos"
 
@@ -34,14 +39,15 @@ class Workout(Base):
     user = relationship("User", back_populates="workouts")
     days = relationship("WorkoutDay", back_populates="workout", cascade="all, delete-orphan")
 
+
 class WorkoutDay(Base):
     __tablename__ = "app_treino_dias"
 
     id = Column(String, primary_key=True, default=generate_uuid)
     workout_id = Column(String, ForeignKey("app_treinos.id", ondelete="CASCADE"), nullable=False)
-    dia = Column(String, nullable=False)          # Ex: "Treino A"
-    foco = Column(String, nullable=False)         # Ex: "Peito e Tríceps"
-    exercicios = Column(String, nullable=False)   # String com quebras de linha dos exercícios
+    dia = Column(String, nullable=False)  # Ex: "Treino A"
+    foco = Column(String, nullable=False)  # Ex: "Peito e Tríceps"
+    exercicios = Column(String, nullable=False)  # String com quebras de linha dos exercícios
 
     # Relacionamento
     workout = relationship("Workout", back_populates="days")

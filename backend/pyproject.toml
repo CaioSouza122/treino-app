@@ -1,12 +1,18 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-select = ["E", "F", "W", "I", "UP", "B", "C4"]
-ignore = ["E501"]
 exclude = ["venv", ".venv", "__pycache__"]
 
-[tool.ruff.isort]
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
 known-first-party = ["app", "routes", "services", "models", "schemas", "database"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Depends() como valor padrão é o padrão do FastAPI para injeção de dependências
+extend-immutable-calls = ["fastapi.Depends"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
