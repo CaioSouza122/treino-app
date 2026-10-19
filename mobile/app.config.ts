@@ -50,6 +50,11 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
   },
+  // Projeto no EAS (expo.dev) usado para gerar o APK/AAB — não é segredo
+  owner: "caio_00",
+  extra: {
+    eas: { projectId: "346a60ab-faf6-4e9c-abb4-16d5ef0b743d" },
+  },
 };
 
 export default config;
