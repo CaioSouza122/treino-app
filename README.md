@@ -55,6 +55,7 @@ aceita chamadas com a chave `X-API-KEY`, e o backend envia o mesmo valor configu
 | ✅ Checklist de exercícios com progresso salvo no dia | ✅ |
 | 📈 Registro de carga, gráficos de frequência e de evolução de força | ✅ |
 | 🔐 Login com e-mail e senha (cadastro, sessão de 30 dias, sair) | ✅ |
+| ⚙️ Configurações: editar nome, trocar senha, excluir conta, tela ligada no treino, vibração, apagar progresso, status do servidor | ✅ |
 | ☁️ Histórico de treinos no PostgreSQL (Neon), por conta | ✅ |
 | 💬 Coach IA em conversa | 🚧 Prévia: respostas ainda são fixas |
 | 🔑 Login com Google/Apple · recuperar senha | 🔜 |
@@ -165,6 +166,9 @@ make docker-up                   # backend com hot-reload + Postgres local
 | `POST` | `/auth/cadastro` | — | `{nome, email, senha}` → `201 {token, usuario}`; e-mail repetido → `409` |
 | `POST` | `/auth/login` | — | `{email, senha}` → `{token, usuario}`; dados errados → `401` |
 | `GET` | `/auth/me` | ✔ | Dados da conta logada |
+| `PATCH` | `/auth/me` | ✔ | `{nome}` → altera o nome |
+| `POST` | `/auth/senha` | ✔ | `{senha_atual, nova_senha}` → `204`; senha atual errada → `400` |
+| `DELETE` | `/auth/conta` | ✔ | `{senha}` → `204`; apaga conta, perfil e todo o histórico |
 | `POST` | `/gerar-treino-ia` | ✔ | Gera o treino, salva no histórico da conta e devolve os dias |
 | `GET` | `/historico` | ✔ | 50 treinos mais recentes da conta |
 
@@ -195,7 +199,7 @@ igual para senha errada e e-mail inexistente, e aceita no máximo 10 tentativas 
 ## Testes e qualidade
 
 ```bash
-make test        # 37 testes do backend
+make test        # 42 testes do backend
 make lint        # Ruff + ESLint + TypeScript
 ```
 

@@ -49,6 +49,11 @@ async function saveLogs(logs: ProgressLog[]): Promise<void> {
 }
 
 /** Cria ou atualiza o log (mesmo dia + treino + sessão + exercício). Devolve a lista nova. */
+/** Apaga checklist e cargas registradas neste aparelho. */
+export async function limparProgresso(): Promise<void> {
+  await AsyncStorage.removeItem(KEY);
+}
+
 export async function upsertLog(log: Omit<ProgressLog, "id" | "ts">): Promise<ProgressLog[]> {
   const logs = await getLogs();
   const id = logId(log.workoutId, log.session, log.exercise, log.date);

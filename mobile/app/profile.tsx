@@ -208,6 +208,7 @@ export default function ProfileScreen() {
                       router.replace("/(tabs)/plans" as never);
                     if (item.label === "Montar treino com IA")
                       router.replace("/(tabs)/chat" as never);
+                    if (item.label === "Configurações") router.push("/settings" as never);
                   }}
                   style={({ pressed }) => [styles.item, pressed && styles.pressed]}
                 >

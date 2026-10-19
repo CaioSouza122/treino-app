@@ -13,6 +13,13 @@ def _normalizar_email(valor: str) -> str:
     return email
 
 
+def _limpar_nome(valor: str) -> str:
+    nome = " ".join(valor.split())
+    if len(nome) < 2:
+        raise ValueError("Informe seu nome.")
+    return nome
+
+
 class LoginRequest(BaseModel):
     email: str = Field(max_length=255)
     senha: str = Field(min_length=1, max_length=128)
@@ -26,14 +33,7 @@ class CadastroRequest(BaseModel):
     senha: str = Field(min_length=8, max_length=128)
 
     _email = field_validator("email")(_normalizar_email)
-
-    @field_validator("nome")
-    @classmethod
-    def limpar_nome(cls, valor: str) -> str:
-        nome = " ".join(valor.split())
-        if len(nome) < 2:
-            raise ValueError("Informe seu nome.")
-        return nome
+    _nome = field_validator("nome")(_limpar_nome)
 
 
 class UsuarioResponse(BaseModel):
@@ -45,3 +45,18 @@ class UsuarioResponse(BaseModel):
 class SessaoResponse(BaseModel):
     token: str
     usuario: UsuarioResponse
+
+
+class AtualizarContaRequest(BaseModel):
+    nome: str = Field(min_length=2, max_length=80)
+
+    _nome = field_validator("nome")(_limpar_nome)
+
+
+class TrocarSenhaRequest(BaseModel):
+    senha_atual: str = Field(min_length=1, max_length=128)
+    nova_senha: str = Field(min_length=8, max_length=128)
+
+
+class ExcluirContaRequest(BaseModel):
+    senha: str = Field(min_length=1, max_length=128)

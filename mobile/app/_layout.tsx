@@ -7,9 +7,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { brand } from "@/constants/brand";
+import { carregarPreferencias } from "@/lib/preferences";
 import { getToken } from "@/lib/session";
 
 void SplashScreen.preventAutoHideAsync();
+void carregarPreferencias();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ ChakraPetch_600SemiBold, ChakraPetch_700Bold });
@@ -31,6 +33,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="workout-detail" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="profile" options={{ animation: "fade", contentStyle: { backgroundColor: "transparent" }, presentation: "transparentModal" }} />
         </Stack>
       </SafeAreaProvider>

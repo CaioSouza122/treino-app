@@ -1,6 +1,6 @@
 import { apiCall } from "@/lib/_core/api";
 import { getProfile, saveProfile } from "@/lib/profile";
-import { salvarSessao, type Usuario } from "@/lib/session";
+import { encerrarSessao, getToken, salvarSessao, type Usuario } from "@/lib/session";
 
 type Sessao = { token: string; usuario: Usuario };
 
@@ -20,4 +20,26 @@ export async function criarConta(nome: string, email: string, senha: string): Pr
   return iniciar(
     await apiCall<Sessao>("/auth/cadastro", { method: "POST", body: JSON.stringify({ nome, email, senha }) }),
   );
+}
+
+export async function atualizarNome(nome: string): Promise<Usuario> {
+  const usuario = await apiCall<Usuario>("/auth/me", { method: "PATCH", body: JSON.stringify({ nome }) });
+  const token = await getToken();
+  if (token) await salvarSessao(token, usuario);
+  const perfil = await getProfile();
+  await saveProfile({ ...perfil, name: usuario.nome });
+  return usuario;
+}
+
+export async function trocarSenha(senhaAtual: string, novaSenha: string): Promise<void> {
+  await apiCall<void>("/auth/senha", {
+    method: "POST",
+    body: JSON.stringify({ senha_atual: senhaAtual, nova_senha: novaSenha }),
+  });
+}
+
+/** Apaga a conta no servidor e encerra a sessão neste aparelho. */
+export async function excluirConta(senha: string): Promise<void> {
+  await apiCall<void>("/auth/conta", { method: "DELETE", body: JSON.stringify({ senha }) });
+  await encerrarSessao();
 }
