@@ -29,6 +29,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Cache de 1 hora das gerações e a rota pública `/testar-api-flask`
 
 ### Corrigido
+- 💬 O objetivo escrito no chat era ignorado: o treino sempre usava o "hipertrofia" do perfil. Agora o Coach pergunta o objetivo e ele vai para a IA; o campo saiu do perfil
+- 🏷️ Treinos da reserva local apareciam como "Gerado pela IA"; agora aparecem como "Treino padrão", com aviso
+- 🧾 Linhas de anotação ("PROTOCOLO:", "GROUP:", "Descanso de 60s") viravam exercícios falsos no checklist
 - 🔌 A IA nunca respondia de verdade: faltava `TREINO_API_KEY` (401) e a API_Treino recusava os campos do perfil (400); o app sempre recebia o treino de reserva
 - 👥 Todos os aparelhos usavam o mesmo `user_id` e viam o histórico uns dos outros; agora cada aparelho gera um ID anônimo
 - 🕙 Datas do histórico saíam sem fuso e o app mostrava o dia seguinte para treinos gerados à noite

@@ -50,6 +50,8 @@ aceita chamadas com a chave `X-API-KEY`, e o backend envia o mesmo valor configu
 | Funcionalidade | Status |
 |---|---|
 | 🤖 Geração de treino via IA com o perfil completo | ✅ |
+| 💬 Objetivo perguntado pelo Coach IA (atalhos ou texto livre) | ✅ |
+| 🏷️ Aviso quando o treino veio da reserva local (IA indisponível) | ✅ |
 | 🔄 Treino de reserva local quando a IA falha | ✅ |
 | 🏋️ Próximo treino em destaque e plano da semana | ✅ |
 | ✅ Checklist de exercícios com progresso salvo no dia | ✅ |
@@ -199,7 +201,7 @@ igual para senha errada e e-mail inexistente, e aceita no máximo 10 tentativas 
 ## Testes e qualidade
 
 ```bash
-make test        # 42 testes do backend
+make test        # 50 testes do backend
 make lint        # Ruff + ESLint + TypeScript
 ```
 
@@ -237,7 +239,8 @@ API_Treino caso os dois usem o mesmo banco Neon.
   credenciais dos provedores e um serviço de envio de e-mail. O e-mail não é confirmado no cadastro.
 - **Dados no aparelho:** perfil, checklist e cargas ficam no aparelho (não sincronizam entre
   aparelhos) e são apagados ao sair da conta.
-- **Coach IA:** o chat ainda responde com mensagens fixas; "Gerar treino" usa o perfil, não a conversa.
+- **Coach IA:** o chat pergunta o objetivo (atalhos ou texto livre, enviado à IA como foi escrito);
+  ainda não é uma conversa aberta com a IA.
 - **NativeWind:** instalado, mas o `global.css` não é importado. As telas usam `StyleSheet`.
 - **Limites de geração em memória:** valem por instância. Com mais de uma instância no Render,
   é preciso movê-los para um armazenamento compartilhado (Redis).

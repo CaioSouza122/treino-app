@@ -74,7 +74,7 @@ export default function PlansScreen() {
                 <Text style={styles.date}>{new Date(current.created_at).toLocaleDateString("pt-BR")}</Text>
               </View>
               <Text style={styles.currentTitle}>{current.days[0]?.foco || "Treino personalizado"}</Text>
-              <Text style={styles.currentSub}>{current.days.length} dias por semana · gerado pela IA</Text>
+              <Text style={styles.currentSub}>{current.days.length} dias por semana · {current.fonte === "reserva" ? "treino padrão" : "gerado pela IA"}</Text>
             </Pressable>
           </Entrance>
         )}
