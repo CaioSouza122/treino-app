@@ -39,7 +39,16 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: 🔍 Lint com Ruff
-        run: ruff check . || true
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: 🗄️ Migrations batem com os models
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///./ci-migrations.db"
+        run: |
+          alembic upgrade head
+          alembic check
 
       - name: 🧪 Executar testes
         env:

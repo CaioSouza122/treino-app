@@ -24,6 +24,7 @@ COPY . .
 # Expõe a porta da API
 EXPOSE 8000
 
-# Comando de produção. O Render define $PORT; --proxy-headers faz o uvicorn ler o IP real
-# do cliente no X-Forwarded-For (usado pelo limite de gerações). Hot-reload: docker-compose.yml.
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips "*"
+# Comando de produção: aplica as migrations e sobe a API. O Render define $PORT;
+# --proxy-headers faz o uvicorn ler o IP real do cliente no X-Forwarded-For (usado pelo
+# limite de gerações). Hot-reload em desenvolvimento: docker-compose.yml.
+CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips "*"
