@@ -1,12 +1,29 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import models.user  # noqa: F401 — garante que os modelos são importados
-from database.connection import Base, engine
+from database.connection import engine
 from routes import auth, treino
+
+_BACKEND = Path(__file__).resolve().parent.parent
+
+
+def aplicar_migrations() -> None:
+    """
+    Leva o banco até a última migration. O create_all antigo só criava tabelas novas e
+    nunca adicionava colunas: um banco anterior à 0003 ficava sem app_treinos.fonte e
+    todo treino gerado falhava ao salvar. As migrations são idempotentes.
+    """
+    config = Config(str(_BACKEND / "alembic.ini"))
+    config.set_main_option("script_location", str(_BACKEND / "migrations"))
+    command.upgrade(config, "head")
 
 
 @asynccontextmanager
@@ -14,9 +31,9 @@ async def lifespan(app: FastAPI):
     """Gerencia o ciclo de vida da aplicação (startup / shutdown)."""
     # ── Startup ──────────────────────────────────────────────────────────────
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        print("[OK] Tabelas de banco de dados verificadas/criadas com sucesso!")
+        # O env.py do Alembic roda o próprio event loop: fica numa thread separada
+        await asyncio.to_thread(aplicar_migrations)
+        print("[OK] Banco de dados atualizado (migrations aplicadas).")
     except Exception as e:
         print(f"[ERRO] Erro ao inicializar o banco de dados: {e}")
 
