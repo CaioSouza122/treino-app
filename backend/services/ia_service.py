@@ -216,6 +216,33 @@ def montar_payload_ia(dados) -> dict:
     }
 
 
+# A API de IA fica num serviço do Render que dorme quando parado: acordar leva ~30s e a
+# geração outros ~25s. Com 60s a conta estourava e o app caía no treino de reserva.
+TIMEOUT_API = 100.0
+# Enquanto acorda, o Render pode responder 502/503/504 ou recusar a conexão.
+_STATUS_ACORDANDO = (502, 503, 504)
+
+
+async def _postar(url: str, payload: dict, headers: dict) -> httpx.Response:
+    """POST na API de IA, com uma nova tentativa se o serviço ainda estava acordando."""
+    for tentativa in (1, 2):
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+                resposta = await client.post(url, json=payload, headers=headers)
+        except httpx.ConnectError as e:
+            if tentativa == 2:
+                raise
+            print(f"[WARN] API externa recusou a conexão ({e}); tentando de novo")
+            continue
+        if resposta.status_code in _STATUS_ACORDANDO and tentativa == 1:
+            print(
+                f"[WARN] API externa respondeu {resposta.status_code} (acordando?); tentando de novo"
+            )
+            continue
+        return resposta
+    raise RuntimeError("inalcançável")  # pragma: no cover
+
+
 async def _chamar_api_externa(dados):
     """
     Chama o endpoint POST /api/v1/treino da API no Render sem bloquear o event loop.
@@ -231,8 +258,7 @@ async def _chamar_api_externa(dados):
     print(f"[INFO] Chamando API Render: {url}")
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
+        response = await _postar(url, payload, headers)
 
         print(f"[INFO] Status da API Externa: {response.status_code}")
 
