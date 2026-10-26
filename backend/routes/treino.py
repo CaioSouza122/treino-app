@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +8,7 @@ from database.connection import get_db
 from models.user import Conta, User, Workout, WorkoutDay
 from routes.auth import conta_atual
 from schemas.treino_schema import TreinoRequest, WorkoutResponse
-from services.ia_service import gerar_treino_ia
+from services.ia_service import gerar_treino_ia, motivo_reserva
 from services.limite import LimitePorCliente
 
 router = APIRouter()
@@ -80,6 +80,7 @@ async def salvar_perfil(
 async def gerar_treino(
     dados: TreinoRequest,
     request: Request,
+    response: Response,
     conta: Conta = Depends(conta_atual),
     db: AsyncSession = Depends(get_db),
 ):
@@ -98,6 +99,9 @@ async def gerar_treino(
         raise HTTPException(
             status_code=500, detail="Não foi possível gerar o treino. Tente novamente."
         )
+    if fonte == "reserva":
+        # Só um código (ex.: api_recusou_a_chave_http_401): diagnostica a produção sem o log
+        response.headers["X-Motivo-Reserva"] = motivo_reserva.get() or "desconhecido"
 
     # 2. Tenta salvar no PostgreSQL de forma resiliente
     try:

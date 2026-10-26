@@ -1,6 +1,8 @@
+import asyncio
 import os
 import re
 import unicodedata
+from contextvars import ContextVar
 
 import httpx
 
@@ -14,6 +16,11 @@ TREINO_API_URL = os.getenv("TREINO_API_URL", "https://api-treino-ygh4.onrender.c
 TREINO_API_KEY = os.getenv("TREINO_API_KEY", "")
 
 
+# Por que o último treino da requisição atual veio da reserva; a rota devolve isso em um
+# cabeçalho para diagnosticar a produção sem depender do log do Render.
+motivo_reserva: ContextVar[str] = ContextVar("motivo_reserva", default="")
+
+
 async def gerar_treino_ia(dados) -> tuple[list, str]:
     """
     Gera treino personalizado chamando a API no Render (que usa o Gemini internamente).
@@ -23,6 +30,7 @@ async def gerar_treino_ia(dados) -> tuple[list, str]:
     Devolve (dias, fonte), com fonte "ia" ou "reserva", para o app avisar quando o
     treino veio dos modelos locais.
     """
+    motivo_reserva.set("")
     try:
         resposta = await _chamar_api_externa(dados)
         if resposta:
@@ -31,6 +39,7 @@ async def gerar_treino_ia(dados) -> tuple[list, str]:
         print("[INFO] API externa indisponivel - usando engine de fallback local.")
     except Exception as e:
         print(f"[ERRO] Erro geral ao gerar treino: {e}")
+        motivo_reserva.set(f"erro_geral_{type(e).__name__}")
     return _gerar_treino_local(dados), "reserva"
 
 
@@ -219,28 +228,37 @@ def montar_payload_ia(dados) -> dict:
 # A API de IA fica num serviço do Render que dorme quando parado: acordar leva ~30s e a
 # geração outros ~25s. Com 60s a conta estourava e o app caía no treino de reserva.
 TIMEOUT_API = 100.0
-# Enquanto acorda, o Render pode responder 502/503/504 ou recusar a conexão.
-_STATUS_ACORDANDO = (502, 503, 504)
+# Enquanto acorda (ou sob limite passageiro), o Render pode responder 429/502/503/504 ou
+# recusar a conexão. Segundos de espera entre as tentativas: 4s e depois 8s.
+_STATUS_PASSAGEIROS = (429, 502, 503, 504)
+_PAUSAS = (4, 8)
 
 
 async def _postar(url: str, payload: dict, headers: dict) -> httpx.Response:
-    """POST na API de IA, com uma nova tentativa se o serviço ainda estava acordando."""
-    for tentativa in (1, 2):
+    """POST na API de IA, tentando de novo (até 3 vezes) enquanto o erro parecer passageiro."""
+    for tentativa, pausa in enumerate((*_PAUSAS, None), start=1):
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
                 resposta = await client.post(url, json=payload, headers=headers)
         except httpx.ConnectError as e:
-            if tentativa == 2:
+            if pausa is None:
                 raise
-            print(f"[WARN] API externa recusou a conexão ({e}); tentando de novo")
-            continue
-        if resposta.status_code in _STATUS_ACORDANDO and tentativa == 1:
+            print(f"[WARN] API externa recusou a conexão ({e}); tentando de novo em {pausa}s")
+        else:
+            if resposta.status_code not in _STATUS_PASSAGEIROS or pausa is None:
+                return resposta
             print(
-                f"[WARN] API externa respondeu {resposta.status_code} (acordando?); tentando de novo"
+                f"[WARN] API externa respondeu {resposta.status_code} "
+                f"(tentativa {tentativa}); tentando de novo em {pausa}s"
             )
-            continue
-        return resposta
+        await asyncio.sleep(pausa)
     raise RuntimeError("inalcançável")  # pragma: no cover
+
+
+def _falhou(motivo: str) -> None:
+    """Guarda por que a IA não respondeu (só códigos, nunca a chave nem a resposta)."""
+    motivo_reserva.set(motivo)
+    return None
 
 
 async def _chamar_api_externa(dados):
@@ -264,11 +282,14 @@ async def _chamar_api_externa(dados):
 
         if response.status_code == 401:
             print("[WARN] Erro de autenticação! Verifique TREINO_API_KEY no .env")
-            return None
+            return _falhou(f"api_recusou_a_chave_http_401 chave_configurada={bool(chave_api)}")
 
         if response.status_code == 429:
-            print("[WARN] Rate limit atingido na API externa. Aguarde.")
-            return None
+            retry_after = re.sub(r"[^0-9A-Za-z ,:-]", "", response.headers.get("retry-after", ""))
+            print(
+                f"[WARN] Rate limit na API externa (Retry-After={retry_after!r}): {response.text[:300]}"
+            )
+            return _falhou(f"api_com_limite_de_uso_http_429 retry_after={retry_after[:20]}")
 
         response.raise_for_status()
         data = response.json()
@@ -277,22 +298,22 @@ async def _chamar_api_externa(dados):
         treino_texto = data.get("treino_gerado", "")
         if not treino_texto:
             print(f"[ERRO] Campo 'treino_gerado' vazio na resposta: {data}")
-            return None
+            return _falhou("resposta_sem_treino_gerado")
 
         return _converter_texto_para_dias(treino_texto, dados)
 
     except httpx.ConnectError as e:
         print(f"[WARN] Nao conseguiu conectar em {url}: {e}")
-        return None
+        return _falhou("sem_conexao_com_a_api")
     except httpx.TimeoutException:
         print(f"[WARN] Timeout ao chamar {url}")
-        return None
+        return _falhou("timeout")
     except httpx.HTTPStatusError as e:
         print(f"[ERRO] Erro HTTP {e.response.status_code}: {e.response.text}")
-        return None
+        return _falhou(f"api_respondeu_http_{e.response.status_code}")
     except Exception as e:
         print(f"[ERRO] Erro inesperado ao chamar API externa: {type(e).__name__}: {e}")
-        return None
+        return _falhou(f"erro_inesperado_{type(e).__name__}")
 
 
 # Cabeçalho de cada dia: "Treino A: Peito", "**Treino B - Costas**", "### Dia 3: Pernas"

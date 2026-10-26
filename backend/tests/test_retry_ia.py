@@ -1,9 +1,21 @@
-"""A API de IA dorme no Render: o backend tenta de novo enquanto ela acorda."""
+"""A API de IA dorme no Render: o backend tenta de novo enquanto ela acorda ou limita."""
 
 import httpx
 import pytest
 
 from services import ia_service
+
+
+@pytest.fixture(autouse=True)
+def sem_espera(monkeypatch):
+    """As pausas entre tentativas (4s e 8s) não podem atrasar a suíte."""
+    pausas = []
+
+    async def dormir(segundos):
+        pausas.append(segundos)
+
+    monkeypatch.setattr(ia_service.asyncio, "sleep", dormir)
+    return pausas
 
 
 def _cliente_falso(respostas: list):
@@ -31,15 +43,16 @@ def _cliente_falso(respostas: list):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("acordando", [502, 503, 504])
-async def test_tenta_de_novo_quando_a_api_esta_acordando(monkeypatch, acordando):
-    falso, chamadas = _cliente_falso([acordando, 201])
+@pytest.mark.parametrize("passageiro", [429, 502, 503, 504])
+async def test_tenta_de_novo_em_erro_passageiro(monkeypatch, sem_espera, passageiro):
+    falso, chamadas = _cliente_falso([passageiro, 201])
     monkeypatch.setattr(ia_service.httpx, "AsyncClient", falso)
 
     resposta = await ia_service._postar("http://ia/treino", {}, {})
 
     assert resposta.status_code == 201
     assert len(chamadas) == 2
+    assert sem_espera == [4]
 
 
 @pytest.mark.asyncio
@@ -54,8 +67,20 @@ async def test_tenta_de_novo_quando_a_conexao_e_recusada(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status", [401, 429, 500])
-async def test_nao_repete_erros_que_nao_sao_de_cold_start(monkeypatch, status):
+async def test_espera_mais_a_cada_tentativa_e_recupera_na_terceira(monkeypatch, sem_espera):
+    falso, chamadas = _cliente_falso([429, 429, 201])
+    monkeypatch.setattr(ia_service.httpx, "AsyncClient", falso)
+
+    resposta = await ia_service._postar("http://ia/treino", {}, {})
+
+    assert resposta.status_code == 201
+    assert len(chamadas) == 3
+    assert sem_espera == [4, 8]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [401, 404, 500])
+async def test_nao_repete_erros_que_nao_sao_passageiros(monkeypatch, status):
     falso, chamadas = _cliente_falso([status, 201])
     monkeypatch.setattr(ia_service.httpx, "AsyncClient", falso)
 
@@ -66,11 +91,23 @@ async def test_nao_repete_erros_que_nao_sao_de_cold_start(monkeypatch, status):
 
 
 @pytest.mark.asyncio
-async def test_desiste_depois_de_duas_tentativas(monkeypatch):
-    falso, chamadas = _cliente_falso([503, 503, 201])
+async def test_desiste_depois_de_tres_tentativas(monkeypatch):
+    falso, chamadas = _cliente_falso([429, 429, 429, 201])
     monkeypatch.setattr(ia_service.httpx, "AsyncClient", falso)
 
     resposta = await ia_service._postar("http://ia/treino", {}, {})
 
-    assert resposta.status_code == 503
-    assert len(chamadas) == 2
+    assert resposta.status_code == 429
+    assert len(chamadas) == 3
+
+
+@pytest.mark.asyncio
+async def test_conexao_recusada_tres_vezes_levanta_o_erro(monkeypatch):
+    erro = httpx.ConnectError("fora do ar")
+    falso, chamadas = _cliente_falso([erro, erro, erro])
+    monkeypatch.setattr(ia_service.httpx, "AsyncClient", falso)
+
+    with pytest.raises(httpx.ConnectError):
+        await ia_service._postar("http://ia/treino", {}, {})
+
+    assert len(chamadas) == 3
