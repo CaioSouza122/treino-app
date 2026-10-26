@@ -41,5 +41,5 @@ export async function trocarSenha(senhaAtual: string, novaSenha: string): Promis
 /** Apaga a conta no servidor e encerra a sessão neste aparelho. */
 export async function excluirConta(senha: string): Promise<void> {
   await apiCall<void>("/auth/conta", { method: "DELETE", body: JSON.stringify({ senha }) });
-  await encerrarSessao();
+  await encerrarSessao({ apagarPerfil: true });
 }

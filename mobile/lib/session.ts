@@ -41,9 +41,23 @@ export async function salvarSessao(token: string, usuario: Usuario): Promise<voi
   await AsyncStorage.setItem(USUARIO_KEY, JSON.stringify(usuario));
 }
 
-/** Sai da conta e apaga os dados locais do app (perfil, último treino, cargas). */
-export async function encerrarSessao(): Promise<void> {
+/**
+ * Chave do perfil de treino (altura, peso, objetivo...) de uma conta. Fica fora do prefixo
+ * "treinoai" de propósito: sair da conta (ou o token vencer) não pode apagar o que o usuário
+ * digitou; ao entrar de novo na mesma conta o perfil continua lá.
+ */
+export function chavePerfil(usuarioId: string | null): string {
+  return `perfil:${usuarioId ?? "local"}`;
+}
+
+/**
+ * Sai da conta e apaga os dados locais da sessão (último treino, cargas). O perfil da conta
+ * é mantido, a não ser que a conta tenha sido excluída (`apagarPerfil`).
+ */
+export async function encerrarSessao({ apagarPerfil = false } = {}): Promise<void> {
+  const usuario = apagarPerfil ? await getUsuario() : null;
   await apagarSeguro(TOKEN_KEY);
   const chaves = await AsyncStorage.getAllKeys();
   await AsyncStorage.multiRemove(chaves.filter((chave) => chave.startsWith("treinoai")));
+  if (usuario) await AsyncStorage.removeItem(chavePerfil(usuario.id));
 }

@@ -3,8 +3,9 @@ import { router } from "expo-router";
 
 import { encerrarSessao, getToken } from "@/lib/session";
 
-// Render acorda o serviço em ~20s e o Gemini leva outros ~20s para gerar o treino
-const TIMEOUT_MS = 90_000;
+// No Render, acordar o backend (~40s), acordar a API de IA (~30s) e gerar o treino (~25s)
+// somam mais de 90s no primeiro pedido; o backend espera até 100s pela IA.
+const TIMEOUT_MS = 130_000;
 
 export function getApiBaseUrl(): string {
   return (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");

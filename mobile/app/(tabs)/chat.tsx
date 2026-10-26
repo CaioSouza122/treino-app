@@ -9,6 +9,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { Label } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
+import { ehObjetivo } from "@/lib/objetivo";
 import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
 import { getUsuario } from "@/lib/session";
 import { generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
@@ -58,11 +59,16 @@ export default function ChatScreen() {
     const stamp = Date.now();
     const doUsuario: Message = { id: String(stamp), from: "user", text: resposta };
 
-    if (resposta.length < 3) {
+    // Só aceita o que o backend reconhece como objetivo: "gere" não vira nome de treino
+    if (!ehObjetivo(resposta)) {
       setMessages((atuais) => [
         ...atuais,
         doUsuario,
-        { id: String(stamp + 1), from: "coach", text: "Me conte um pouco mais — por exemplo, “emagrecer” ou “ganhar massa”." },
+        {
+          id: String(stamp + 1),
+          from: "coach",
+          text: "Não entendi isso como um objetivo. Escolha uma das opções ou escreva algo como “emagrecer”, “ganhar massa” ou “mais força”.",
+        },
       ]);
       return;
     }
