@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { apiCall } from "@/lib/_core/api";
 import { chavePerfil, getUsuario } from "@/lib/session";
 
 export type UserProfile = {
@@ -56,4 +57,25 @@ export async function getProfile(): Promise<UserProfile> {
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
   await AsyncStorage.setItem(await chaveAtual(), JSON.stringify(profile));
+}
+
+/** Guarda o perfil na conta (servidor): sobrevive a desinstalar o app e a trocar de celular. */
+export async function enviarPerfil(profile: UserProfile): Promise<void> {
+  const { name: _nome, ...dados } = profile;
+  await apiCall<void>("/perfil", { method: "PUT", body: JSON.stringify(dados) });
+}
+
+/**
+ * Ao entrar: se a conta já tem perfil no servidor, ele vale mais que o do aparelho (que pode
+ * ser o padrão de uma instalação nova). Sem perfil no servidor, fica o que há no aparelho.
+ * Falha de rede não impede o login: o app segue com os dados locais.
+ */
+export async function sincronizarPerfil(): Promise<void> {
+  try {
+    const remoto = await apiCall<Omit<UserProfile, "name"> | null>("/perfil");
+    if (!remoto) return;
+    await saveProfile({ ...(await getProfile()), ...remoto });
+  } catch {
+    // Sem rede ou servidor acordando: usa o perfil local
+  }
 }

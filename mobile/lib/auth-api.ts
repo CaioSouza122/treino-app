@@ -1,11 +1,13 @@
 import { apiCall } from "@/lib/_core/api";
-import { getProfile, saveProfile } from "@/lib/profile";
+import { getProfile, saveProfile, sincronizarPerfil } from "@/lib/profile";
 import { encerrarSessao, getToken, salvarSessao, type Usuario } from "@/lib/session";
 
 type Sessao = { token: string; usuario: Usuario };
 
 async function iniciar(sessao: Sessao): Promise<Usuario> {
   await salvarSessao(sessao.token, sessao.usuario);
+  // Traz o perfil da conta (altura, peso, objetivo...) antes de qualquer tela pedir os dados
+  await sincronizarPerfil();
   // O nome da conta aparece na saudação da tela inicial
   const perfil = await getProfile();
   await saveProfile({ ...perfil, name: sessao.usuario.nome });

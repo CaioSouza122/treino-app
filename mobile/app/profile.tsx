@@ -16,7 +16,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { Label, SectionHead } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
-import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
+import { defaultProfile, enviarPerfil, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
 import { encerrarSessao } from "@/lib/session";
 
 const menu = [
@@ -60,6 +60,8 @@ export default function ProfileScreen() {
       return;
     setSaving(true);
     await saveProfile(profile);
+    // Guarda também na conta; sem rede, os dados ficam no aparelho e vão no próximo salvar
+    await enviarPerfil(profile).catch(() => {});
     setSaving(false);
     setSaved(true);
     haptic.success();
