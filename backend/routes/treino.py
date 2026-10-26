@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,6 +20,60 @@ limite_geracoes = LimitePorCliente(
     janela=60,
     mensagem="Muitos treinos gerados em pouco tempo. Aguarde um minuto e tente de novo.",
 )
+
+
+async def _gravar_perfil(db: AsyncSession, user_id: str, dados: TreinoRequest) -> User:
+    """Cria ou atualiza os dados físicos da conta (sem commit)."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    usuario = result.scalar_one_or_none()
+    if usuario is None:
+        usuario = User(id=user_id)
+        db.add(usuario)
+    usuario.altura = dados.altura
+    usuario.peso = dados.peso
+    usuario.idade = dados.idade
+    usuario.vezes_por_semana = dados.vezes_por_semana
+    usuario.objetivo = dados.objetivo
+    usuario.nivel = dados.nivel
+    usuario.tempo = dados.tempo
+    await db.flush()
+    return usuario
+
+
+@router.get("/perfil", response_model=TreinoRequest | None)
+async def obter_perfil(conta: Conta = Depends(conta_atual), db: AsyncSession = Depends(get_db)):
+    """
+    Perfil de treino guardado na conta (altura, peso, objetivo...), ou null se ainda não há.
+    Assim os dados sobrevivem a desinstalar o app ou entrar em outro celular.
+    """
+    result = await db.execute(select(User).where(User.id == conta.id))
+    usuario = result.scalar_one_or_none()
+    if usuario is None:
+        return None
+    try:
+        return TreinoRequest(
+            altura=usuario.altura,
+            peso=usuario.peso,
+            idade=usuario.idade,
+            vezes_por_semana=usuario.vezes_por_semana,
+            objetivo=usuario.objetivo,
+            tempo=usuario.tempo or 30,
+            nivel=usuario.nivel,
+        )
+    except ValidationError:
+        # Linha antiga, de antes dos limites atuais: o app volta a pedir os dados
+        return None
+
+
+@router.put("/perfil", status_code=204)
+async def salvar_perfil(
+    dados: TreinoRequest,
+    conta: Conta = Depends(conta_atual),
+    db: AsyncSession = Depends(get_db),
+):
+    """Guarda o perfil de treino na conta, sem gerar treino."""
+    await _gravar_perfil(db, conta.id, dados)
+    await db.commit()
 
 
 @router.post("/gerar-treino-ia")
@@ -47,35 +102,7 @@ async def gerar_treino(
     # 2. Tenta salvar no PostgreSQL de forma resiliente
     try:
         # O dono do treino vem do token, nunca do corpo da requisição
-        user_id = conta.id
-
-        # Busca se o usuário já existe
-        result = await db.execute(select(User).where(User.id == user_id))
-        usuario = result.scalar_one_or_none()
-
-        if usuario:
-            # Atualiza os dados físicos do usuário
-            usuario.altura = dados.altura
-            usuario.peso = dados.peso
-            usuario.idade = dados.idade
-            usuario.vezes_por_semana = dados.vezes_por_semana
-            usuario.objetivo = dados.objetivo
-            usuario.nivel = dados.nivel
-            usuario.tempo = dados.tempo
-        else:
-            # Cria novo usuário
-            usuario = User(
-                id=user_id,
-                altura=dados.altura,
-                peso=dados.peso,
-                idade=dados.idade,
-                vezes_por_semana=dados.vezes_por_semana,
-                objetivo=dados.objetivo,
-                nivel=dados.nivel,
-                tempo=dados.tempo,
-            )
-            db.add(usuario)
-            await db.flush()
+        usuario = await _gravar_perfil(db, conta.id, dados)
 
         # Cria a sessão de Treino
         novo_treino = Workout(user_id=usuario.id, fonte=fonte)
