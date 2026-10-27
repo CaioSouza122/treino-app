@@ -1,4 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -95,6 +96,8 @@ export default function ChatScreen() {
     if (!objetivo) return;
     setGenerating(true);
     setError(null);
+    // A geração leva até 2 min: com a tela apagada o Android corta a rede do app
+    activateKeepAwakeAsync("gerando-treino").catch(() => {});
     try {
       const payload = { ...(await getProfile()), objetivo };
       const workout = workoutFromGeneratedDays(await generateWorkout(payload));
@@ -103,6 +106,10 @@ export default function ChatScreen() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível gerar o treino.");
     } finally {
+      // Lança se a tela nunca chegou a ficar travada acesa (ex.: no navegador)
+      try {
+        deactivateKeepAwake("gerando-treino").catch(() => {});
+      } catch {}
       setGenerating(false);
     }
   }
