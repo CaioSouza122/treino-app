@@ -9,9 +9,12 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { brand } from "@/constants/brand";
 import { carregarPreferencias } from "@/lib/preferences";
 import { getToken } from "@/lib/session";
+import { acordarServidores } from "@/lib/workouts-api";
 
 void SplashScreen.preventAutoHideAsync();
 void carregarPreferencias();
+// Os servidores do Render acordam enquanto o usuário faz login e navega até o Coach IA
+acordarServidores();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ ChakraPetch_600SemiBold, ChakraPetch_700Bold });

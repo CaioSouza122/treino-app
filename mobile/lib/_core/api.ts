@@ -4,8 +4,8 @@ import { router } from "expo-router";
 import { encerrarSessao, getToken } from "@/lib/session";
 
 // No Render, acordar o backend (~40s), acordar a API de IA (~30s) e gerar o treino (~25s)
-// somam mais de 90s no primeiro pedido; o backend espera até 100s pela IA.
-const TIMEOUT_MS = 130_000;
+// somam mais de 90s no primeiro pedido; o backend dá à IA até 110s, somadas as tentativas.
+const TIMEOUT_MS = 150_000;
 
 export function getApiBaseUrl(): string {
   return (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
@@ -23,6 +23,14 @@ function extractErrorMessage(body: any): string | null {
 }
 
 export async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  return (await apiRequest<T>(endpoint, options)).data;
+}
+
+/** Como apiCall, mas devolve também os cabeçalhos (ex.: X-Motivo-Reserva). */
+export async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<{ data: T; headers: Headers }> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
@@ -57,7 +65,7 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
       }
       throw new Error(message || `Erro ${response.status} ao chamar a API.`);
     }
-    return (text ? JSON.parse(text) : {}) as T;
+    return { data: (text ? JSON.parse(text) : {}) as T, headers: response.headers };
   } catch (error) {
     if (controller.signal.aborted) {
       throw new Error("O servidor demorou demais para responder. Tente novamente.");

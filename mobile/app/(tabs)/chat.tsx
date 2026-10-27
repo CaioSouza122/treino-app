@@ -12,7 +12,7 @@ import { haptic } from "@/lib/haptics";
 import { ehObjetivo } from "@/lib/objetivo";
 import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
 import { getUsuario } from "@/lib/session";
-import { generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
+import { acordarServidores, generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
 
 type Message = { id: string; from: "coach" | "user"; text: string };
 
@@ -43,6 +43,8 @@ export default function ChatScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // O app pode ter ficado em segundo plano tempo bastante para o Render dormir de novo
+      acordarServidores();
       getProfile().then(setProfile).catch(() => setProfile(defaultProfile));
       getUsuario()
         .then((usuario) => setMessages((atuais) => (atuais.length === 1 ? [saudacao(usuario?.nome ?? null)] : atuais)))
@@ -95,8 +97,7 @@ export default function ChatScreen() {
     setError(null);
     try {
       const payload = { ...(await getProfile()), objetivo };
-      const days = await generateWorkout(payload);
-      const workout = workoutFromGeneratedDays(days, payload);
+      const workout = workoutFromGeneratedDays(await generateWorkout(payload));
       await saveLastWorkout(workout);
       router.push({ pathname: "/workout-detail", params: { workoutId: workout.id } });
     } catch (cause) {

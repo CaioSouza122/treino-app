@@ -42,7 +42,13 @@ export default function WorkoutDetailScreen() {
       try {
         const local = await getLastWorkout();
         const history = await getWorkoutHistory().catch(() => []);
-        const selected = history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
+        const encontrado = history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
+        // Recém-gerado: a resposta da geração sabe a fonte e o motivo da reserva, o histórico não
+        const recemGerado = local && local.id === params.workoutId ? local : null;
+        const selected =
+          encontrado && recemGerado
+            ? { ...encontrado, fonte: recemGerado.fonte ?? encontrado.fonte, motivo: recemGerado.motivo }
+            : encontrado;
         const savedLogs = await getLogs();
         if (!active) return;
         setLogs(savedLogs);
@@ -154,6 +160,7 @@ export default function WorkoutDetailScreen() {
               <Text style={styles.reservaTexto}>
                 A IA estava indisponível, então montamos um treino padrão para o seu objetivo. Gere de novo em
                 alguns minutos para receber o plano personalizado.
+                {workout.motivo ? `\nCódigo: ${workout.motivo}` : ""}
               </Text>
             </View>
           )}
