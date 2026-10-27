@@ -5,12 +5,13 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from fastapi import FastAPI
+from fastapi import BackgroundTasks, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import models.user  # noqa: F401 — garante que os modelos são importados
 from database.connection import engine
 from routes import auth, treino
+from services.ia_service import acordar_api_ia
 
 _BACKEND = Path(__file__).resolve().parent.parent
 
@@ -66,6 +67,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # O app web lê o motivo da reserva na resposta de /gerar-treino-ia
+    expose_headers=["X-Motivo-Reserva"],
 )
 
 app.include_router(auth.router)
@@ -76,3 +79,13 @@ app.include_router(treino.router)
 def home():
     """Verifica se a API está online."""
     return {"status": "ok", "message": "HIPERTROF.IA API funcionando corretamente"}
+
+
+@app.get("/acordar", tags=["Health"])
+async def acordar(tarefas: BackgroundTasks):
+    """
+    O app chama ao abrir: este backend já acordou para responder, e a API de IA acorda em
+    segundo plano. Responde na hora, sem esperar a IA.
+    """
+    tarefas.add_task(acordar_api_ia)
+    return {"status": "ok"}

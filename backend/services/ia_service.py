@@ -1,6 +1,7 @@
 import asyncio
 import os
 import re
+import time
 import unicodedata
 from contextvars import ContextVar
 
@@ -19,6 +20,19 @@ TREINO_API_KEY = os.getenv("TREINO_API_KEY", "")
 # Por que o último treino da requisição atual veio da reserva; a rota devolve isso em um
 # cabeçalho para diagnosticar a produção sem depender do log do Render.
 motivo_reserva: ContextVar[str] = ContextVar("motivo_reserva", default="")
+
+
+async def acordar_api_ia() -> None:
+    """
+    Faz um GET na API de IA só para o Render acordá-la (~30s no plano free). O app chama
+    isto ao abrir, e a IA já está de pé quando o usuário toca em Gerar treino.
+    """
+    raiz = TREINO_API_URL.split("/api/")[0]
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            await client.get(raiz)
+    except httpx.HTTPError as e:
+        print(f"[INFO] API de IA não respondeu ao acordar: {type(e).__name__}")
 
 
 async def gerar_treino_ia(dados) -> tuple[list, str]:
@@ -229,23 +243,39 @@ def montar_payload_ia(dados) -> dict:
 # geração outros ~25s. Com 60s a conta estourava e o app caía no treino de reserva.
 TIMEOUT_API = 100.0
 # Enquanto acorda (ou sob limite passageiro), o Render pode responder 429/502/503/504 ou
-# recusar a conexão. Segundos de espera entre as tentativas: 4s e depois 8s.
+# recusar a conexão. Segundos de espera entre as tentativas: 5s, 10s e depois 15s.
 _STATUS_PASSAGEIROS = (429, 502, 503, 504)
-_PAUSAS = (4, 8)
+_PAUSAS = (5, 10, 15)
+
+# Prazo de todas as tentativas somadas. O app desiste em 150s; sem um prazo total, 4
+# tentativas de até 100s cada (Gemini sobrecarregado demora e depois devolve 502)
+# passavam de 5 minutos e o usuário via "o servidor demorou demais" em vez do treino.
+PRAZO_IA = 110.0
+# Abaixo disso não vale começar outra tentativa: o Gemini sozinho leva ~25s
+_MINIMO_POR_TENTATIVA = 30.0
+
+
+def _sem_prazo_para_outra(limite: float, pausa: int | None) -> bool:
+    """True se, depois da pausa, não sobra tempo para mais uma tentativa útil."""
+    return pausa is None or limite - time.monotonic() - pausa < _MINIMO_POR_TENTATIVA
 
 
 async def _postar(url: str, payload: dict, headers: dict) -> httpx.Response:
-    """POST na API de IA, tentando de novo (até 3 vezes) enquanto o erro parecer passageiro."""
+    """POST na API de IA, tentando de novo enquanto o erro parecer passageiro e houver prazo."""
+    limite = time.monotonic() + PRAZO_IA
     for tentativa, pausa in enumerate((*_PAUSAS, None), start=1):
+        restante = limite - time.monotonic()
         try:
-            async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            async with httpx.AsyncClient(timeout=min(TIMEOUT_API, restante)) as client:
                 resposta = await client.post(url, json=payload, headers=headers)
         except httpx.ConnectError as e:
-            if pausa is None:
+            if _sem_prazo_para_outra(limite, pausa):
                 raise
             print(f"[WARN] API externa recusou a conexão ({e}); tentando de novo em {pausa}s")
         else:
-            if resposta.status_code not in _STATUS_PASSAGEIROS or pausa is None:
+            if resposta.status_code not in _STATUS_PASSAGEIROS or _sem_prazo_para_outra(
+                limite, pausa
+            ):
                 return resposta
             print(
                 f"[WARN] API externa respondeu {resposta.status_code} "

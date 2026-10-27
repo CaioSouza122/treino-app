@@ -8,7 +8,7 @@ from services import ia_service
 
 @pytest.fixture(autouse=True)
 def sem_espera(monkeypatch):
-    """As pausas entre tentativas (4s e 8s) não podem atrasar a suíte."""
+    """As pausas entre tentativas (5s, 10s, 15s) não podem atrasar a suíte."""
     pausas = []
 
     async def dormir(segundos):
@@ -52,7 +52,7 @@ async def test_tenta_de_novo_em_erro_passageiro(monkeypatch, sem_espera, passage
 
     assert resposta.status_code == 201
     assert len(chamadas) == 2
-    assert sem_espera == [4]
+    assert sem_espera == [5]
 
 
 @pytest.mark.asyncio
@@ -75,7 +75,7 @@ async def test_espera_mais_a_cada_tentativa_e_recupera_na_terceira(monkeypatch, 
 
     assert resposta.status_code == 201
     assert len(chamadas) == 3
-    assert sem_espera == [4, 8]
+    assert sem_espera == [5, 10]
 
 
 @pytest.mark.asyncio
@@ -91,23 +91,37 @@ async def test_nao_repete_erros_que_nao_sao_passageiros(monkeypatch, status):
 
 
 @pytest.mark.asyncio
-async def test_desiste_depois_de_tres_tentativas(monkeypatch):
-    falso, chamadas = _cliente_falso([429, 429, 429, 201])
+async def test_desiste_depois_de_quatro_tentativas(monkeypatch):
+    falso, chamadas = _cliente_falso([429, 429, 429, 429, 201])
     monkeypatch.setattr(ia_service.httpx, "AsyncClient", falso)
 
     resposta = await ia_service._postar("http://ia/treino", {}, {})
 
     assert resposta.status_code == 429
-    assert len(chamadas) == 3
+    assert len(chamadas) == 4
 
 
 @pytest.mark.asyncio
-async def test_conexao_recusada_tres_vezes_levanta_o_erro(monkeypatch):
+async def test_conexao_recusada_quatro_vezes_levanta_o_erro(monkeypatch):
     erro = httpx.ConnectError("fora do ar")
-    falso, chamadas = _cliente_falso([erro, erro, erro])
+    falso, chamadas = _cliente_falso([erro, erro, erro, erro])
     monkeypatch.setattr(ia_service.httpx, "AsyncClient", falso)
 
     with pytest.raises(httpx.ConnectError):
         await ia_service._postar("http://ia/treino", {}, {})
 
-    assert len(chamadas) == 3
+    assert len(chamadas) == 4
+
+
+@pytest.mark.asyncio
+async def test_nao_tenta_de_novo_sem_prazo_para_outra_geracao(monkeypatch, sem_espera):
+    """Gemini sobrecarregado: melhor a reserva a tempo do que o app desistir esperando."""
+    monkeypatch.setattr(ia_service, "PRAZO_IA", 34.0)
+    falso, chamadas = _cliente_falso([502, 201])
+    monkeypatch.setattr(ia_service.httpx, "AsyncClient", falso)
+
+    resposta = await ia_service._postar("http://ia/treino", {}, {})
+
+    assert resposta.status_code == 502
+    assert len(chamadas) == 1
+    assert sem_espera == []
