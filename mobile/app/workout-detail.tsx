@@ -40,13 +40,9 @@ export default function WorkoutDetailScreen() {
       try {
         const local = await getLastWorkout();
         const history = await getWorkoutHistory().catch(() => []);
-        const encontrado = history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
-        // Recém-gerado: a resposta da geração sabe a fonte e o motivo da reserva, o histórico não
-        const recemGerado = local && local.id === params.workoutId ? local : null;
-        const selected =
-          encontrado && recemGerado
-            ? { ...encontrado, fonte: recemGerado.fonte ?? encontrado.fonte, motivo: recemGerado.motivo }
-            : encontrado;
+        // O histórico do servidor traz a fonte e o motivo da reserva; o treino local é o
+        // plano B sem internet
+        const selected = history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
         const savedLogs = await getLogs();
         if (!active) return;
         setLogs(savedLogs);
