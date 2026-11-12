@@ -73,3 +73,24 @@ async def test_treino_da_ia_nao_tem_cabecalho_de_motivo(monkeypatch):
 
     assert r.status_code == 200
     assert "X-Motivo-Reserva" not in r.headers
+
+
+@pytest.mark.asyncio
+async def test_limite_da_api_informa_qual_limite(monkeypatch):
+    _api_responde(monkeypatch, 429, {"erro": "Limite", "detalhe": "30 per 1 minute"})
+
+    r = await _gerar()
+
+    assert r.headers["X-Motivo-Reserva"].endswith("detalhe=30_per_1_minute")
+
+
+@pytest.mark.asyncio
+async def test_limite_fora_da_api(monkeypatch):
+    async def postar(url, payload, headers):
+        return httpx.Response(429, text="Too Many Requests", request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(ia_service, "_postar", postar)
+
+    r = await _gerar()
+
+    assert r.headers["X-Motivo-Reserva"].endswith("origem=fora_da_api")

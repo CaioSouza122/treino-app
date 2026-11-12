@@ -295,6 +295,21 @@ async def _postar(url: str, payload: dict, headers: dict) -> httpx.Response:
     raise RuntimeError("inalcançável")  # pragma: no cover
 
 
+def _detalhe_do_limite(response: httpx.Response) -> str:
+    """
+    Qual limite deu o 429: o Flask-Limiter da API_Treino responde JSON com "detalhe"
+    (ex.: "30 per 1 minute"); outro corpo indica o Render ou outro intermediário.
+    """
+    try:
+        corpo = response.json()
+    except ValueError:
+        return " origem=fora_da_api"
+    detalhe = corpo.get("detalhe") if isinstance(corpo, dict) else None
+    if not detalhe:
+        return ""
+    return " detalhe=" + re.sub(r"[^0-9A-Za-z ]", "", str(detalhe))[:40].replace(" ", "_")
+
+
 def _falhou(motivo: str) -> None:
     """Guarda por que a IA não respondeu (só códigos, nunca a chave nem a resposta)."""
     motivo_reserva.set(motivo)
@@ -329,7 +344,10 @@ async def _chamar_api_externa(dados):
             print(
                 f"[WARN] Rate limit na API externa (Retry-After={retry_after!r}): {response.text[:300]}"
             )
-            return _falhou(f"api_com_limite_de_uso_http_429 retry_after={retry_after[:20]}")
+            return _falhou(
+                f"api_com_limite_de_uso_http_429 retry_after={retry_after[:20]}"
+                + _detalhe_do_limite(response)
+            )
 
         response.raise_for_status()
         data = response.json()
