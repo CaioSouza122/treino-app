@@ -59,11 +59,21 @@ async def gerar_treino_ia(dados) -> tuple[list, str]:
 
 # Palavras que identificam cada objetivo no texto livre do usuário (sem acento, minúsculo)
 _PALAVRAS_OBJETIVO = (
-    ("emagrecimento", ("emagrec", "perder peso", "perda de peso", "gordura", "secar", "definir")),
-    ("forca", ("forca",)),
-    ("resistencia", ("resist",)),
-    ("condicionamento", ("condicion", "cardio", "folego")),
-    ("hipertrofia", ("hipertrof", "massa", "musculo", "crescer")),
+    (
+        "emagrecimento",
+        ("emagrec", "perder peso", "perda de peso", "gordura", "secar", "definir", "barriga"),
+    ),
+    # "Quero pular mais alto": potência é treino de força
+    ("forca", ("forca", "forte", "fortalec", "potencia", "explos", "pular", "salt", "impuls")),
+    ("resistencia", ("resist", "maratona")),
+    (
+        "condicionamento",
+        ("condicion", "cardio", "folego", "corr", "velocidade", "agilidade", "esporte"),
+    ),
+    (
+        "hipertrofia",
+        ("hipertrof", "massa", "musculo", "crescer", "engordar", "ganhar peso", "tonific"),
+    ),
 )
 
 
