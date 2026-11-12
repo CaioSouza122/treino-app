@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from services import gemini_direto  # noqa: E402 — lê GEMINI_API_KEY depois do .env
+
 # URL base da API de treinos no Render
 TREINO_API_URL = os.getenv("TREINO_API_URL", "https://api-treino-ygh4.onrender.com/api/v1")
 TREINO_API_KEY = os.getenv("TREINO_API_KEY", "")
@@ -45,8 +47,19 @@ async def gerar_treino_ia(dados) -> tuple[list, str]:
     treino veio dos modelos locais.
     """
     motivo_reserva.set("")
+    inicio = time.monotonic()
+    motivo_gemini = ""
     try:
-        resposta = await _chamar_api_externa(dados)
+        # 1º: Gemini direto, sem a borda do Render que às vezes responde 429
+        if gemini_direto.ativo():
+            texto, motivo_gemini = await gemini_direto.gerar(montar_payload_ia(dados))
+            if texto:
+                return _converter_texto_para_dias(texto, dados), "ia"
+            print(f"[WARN] Gemini direto falhou ({motivo_gemini}); tentando a API_Treino")
+
+        # 2º: API_Treino, com o prazo que sobrou
+        prazo = PRAZO_IA - (time.monotonic() - inicio)
+        resposta = await _chamar_api_externa(dados, prazo)
         if resposta:
             return resposta, "ia"
 
@@ -54,6 +67,8 @@ async def gerar_treino_ia(dados) -> tuple[list, str]:
     except Exception as e:
         print(f"[ERRO] Erro geral ao gerar treino: {e}")
         motivo_reserva.set(f"erro_geral_{type(e).__name__}")
+    if motivo_gemini:
+        motivo_reserva.set(f"{motivo_gemini} + {motivo_reserva.get()}")
     return _gerar_treino_local(dados), "reserva"
 
 
@@ -270,9 +285,11 @@ def _sem_prazo_para_outra(limite: float, pausa: int | None) -> bool:
     return pausa is None or limite - time.monotonic() - pausa < _MINIMO_POR_TENTATIVA
 
 
-async def _postar(url: str, payload: dict, headers: dict) -> httpx.Response:
+async def _postar(
+    url: str, payload: dict, headers: dict, prazo: float | None = None
+) -> httpx.Response:
     """POST na API de IA, tentando de novo enquanto o erro parecer passageiro e houver prazo."""
-    limite = time.monotonic() + PRAZO_IA
+    limite = time.monotonic() + (PRAZO_IA if prazo is None else prazo)
     for tentativa, pausa in enumerate((*_PAUSAS, None), start=1):
         restante = limite - time.monotonic()
         try:
@@ -316,7 +333,7 @@ def _falhou(motivo: str) -> None:
     return None
 
 
-async def _chamar_api_externa(dados):
+async def _chamar_api_externa(dados, prazo: float | None = None):
     """
     Chama o endpoint POST /api/v1/treino da API no Render sem bloquear o event loop.
     """
@@ -331,7 +348,7 @@ async def _chamar_api_externa(dados):
     print(f"[INFO] Chamando API Render: {url}")
 
     try:
-        response = await _postar(url, payload, headers)
+        response = await _postar(url, payload, headers, prazo)
 
         print(f"[INFO] Status da API Externa: {response.status_code}")
 

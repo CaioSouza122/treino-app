@@ -123,6 +123,7 @@ API em `http://localhost:8000`, documentação interativa em `http://localhost:8
 | Variável | Obrigatória | Descrição |
 | --- | --- | --- |
 | `TREINO_API_KEY` | Sim | Mesmo valor de `API_AUTH_KEY` na API_Treino. Sem ela, toda geração cai no treino de reserva. |
+| `GEMINI_API_KEY` | Recomendada | Chave do Gemini. O backend chama o Google direto e só usa a API_Treino se ele falhar (no Render free a borda às vezes responde 429 entre os serviços). |
 | `TREINO_API_URL` | Não | URL da API_Treino. Padrão: `https://api-treino-ygh4.onrender.com/api/v1`. |
 | `DATABASE_URL` | Não | Connection string do Neon. Vazio = SQLite local `treinoapp.db`. |
 | `ALLOWED_ORIGINS` | Não | Origens do app web para CORS, separadas por vírgula. Padrão: Expo web local (`:8081`). |

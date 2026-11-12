@@ -18,7 +18,7 @@ PERFIL = {
 
 
 def _api_responde(monkeypatch, status: int, corpo: dict | None = None):
-    async def postar(url, payload, headers):
+    async def postar(url, payload, headers, prazo=None):
         return httpx.Response(status, json=corpo or {}, request=httpx.Request("POST", url))
 
     monkeypatch.setattr(ia_service, "_postar", postar)
@@ -86,7 +86,7 @@ async def test_limite_da_api_informa_qual_limite(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_limite_fora_da_api(monkeypatch):
-    async def postar(url, payload, headers):
+    async def postar(url, payload, headers, prazo=None):
         return httpx.Response(429, text="Too Many Requests", request=httpx.Request("POST", url))
 
     monkeypatch.setattr(ia_service, "_postar", postar)

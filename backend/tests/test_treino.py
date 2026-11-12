@@ -24,7 +24,7 @@ PAYLOAD = {
 def api_externa_offline(monkeypatch):
     """Evita chamadas reais à API no Render: por padrão ela "não responde" e o fallback local entra."""
 
-    async def offline(dados):
+    async def offline(dados, prazo=None):
         return None
 
     monkeypatch.setattr(ia_service, "_chamar_api_externa", offline)
@@ -74,7 +74,7 @@ async def test_gerar_treino_usa_resposta_da_api(monkeypatch):
     """Quando a API externa responde, o resultado dela é usado no lugar do fallback."""
     dias = [{"dia": "Treino A", "foco": "Peito", "exercicios": "Supino reto — 4x8"}]
 
-    async def online(dados):
+    async def online(dados, prazo=None):
         return dias
 
     monkeypatch.setattr(ia_service, "_chamar_api_externa", online)

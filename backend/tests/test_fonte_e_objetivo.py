@@ -21,7 +21,7 @@ PERFIL = {
 async def test_treino_da_ia_vem_marcado_como_ia(monkeypatch):
     dias = [{"dia": "Treino A", "foco": "Circuito", "exercicios": "Burpee — 3x15"}]
 
-    async def online(dados):
+    async def online(dados, prazo=None):
         return dias
 
     monkeypatch.setattr(ia_service, "_chamar_api_externa", online)
@@ -30,7 +30,7 @@ async def test_treino_da_ia_vem_marcado_como_ia(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_treino_de_reserva_vem_marcado_e_aparece_no_historico(monkeypatch):
-    async def offline(dados):
+    async def offline(dados, prazo=None):
         return None
 
     monkeypatch.setattr(ia_service, "_chamar_api_externa", offline)

@@ -18,6 +18,7 @@ from app.main import app  # noqa: E402
 from database.connection import Base, engine  # noqa: E402
 from routes import auth as auth_routes  # noqa: E402
 from routes import treino as treino_routes  # noqa: E402
+from services import gemini_direto  # noqa: E402
 
 
 async def _criar_tabelas():
@@ -32,6 +33,12 @@ asyncio.run(_criar_tabelas())
 def zerar_limites():
     treino_routes.limite_geracoes.chamadas.clear()
     auth_routes.limite_auth.chamadas.clear()
+
+
+@pytest.fixture(autouse=True)
+def sem_gemini_direto(monkeypatch):
+    """Nenhum teste chama o Google: quem testa o Gemini direto liga a chave falsa."""
+    monkeypatch.setattr(gemini_direto, "GEMINI_API_KEY", "")
 
 
 def cliente() -> AsyncClient:
