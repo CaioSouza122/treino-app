@@ -1,7 +1,8 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import Constants from "expo-constants";
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { BrandMark } from "@/components/brand-mark";
 import { PrimaryButton } from "@/components/primary-button";
@@ -14,6 +15,9 @@ import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib
 import { getUsuario } from "@/lib/session";
 import { liberarTela, manterTelaAcesa } from "@/lib/tela-acesa";
 import { acordarServidores, generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
+
+// Commit do APK instalado (app.config.ts): confirma se o celular está com o build novo
+const BUILD = (Constants.expoConfig?.extra?.build as string | undefined) ?? "dev";
 
 type Message = { id: string; from: "coach" | "user"; text: string };
 
@@ -86,6 +90,8 @@ export default function ChatScreen() {
     }
 
     setObjetivo(resposta);
+    // O teclado aberto cobria o botão Gerar treino no Android
+    Keyboard.dismiss();
     // Salva no perfil para a tela inicial e para a próxima geração
     const atualizado = { ...(await getProfile()), objetivo: resposta };
     await saveProfile(atualizado);
@@ -136,7 +142,7 @@ export default function ChatScreen() {
           <BrandMark size={30} />
           <View style={styles.headerCopy}>
             <Text style={styles.title}>Coach IA</Text>
-            <Label color={brand.cyan}>Montar treino</Label>
+            <Label color={brand.cyan}>{`Montar treino · versão ${BUILD}`}</Label>
           </View>
           <Pressable accessibilityLabel="Abrir perfil" onPress={() => router.push("/profile" as never)} style={styles.more}>
             <MaterialIcons name="tune" size={22} color={brand.muted} />
