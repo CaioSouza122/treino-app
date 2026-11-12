@@ -1,7 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { BrandMark } from "@/components/brand-mark";
@@ -13,6 +12,7 @@ import { haptic } from "@/lib/haptics";
 import { ehObjetivo } from "@/lib/objetivo";
 import { defaultProfile, getProfile, saveProfile, type UserProfile } from "@/lib/profile";
 import { getUsuario } from "@/lib/session";
+import { liberarTela, manterTelaAcesa } from "@/lib/tela-acesa";
 import { acordarServidores, generateWorkout, saveLastWorkout, workoutFromGeneratedDays } from "@/lib/workouts-api";
 
 type Message = { id: string; from: "coach" | "user"; text: string };
@@ -40,7 +40,16 @@ export default function ChatScreen() {
   const [objetivo, setObjetivo] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Segundos desde o toque em Gerar treino, mostrados no botão
+  const [segundos, setSegundos] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (!generating) return;
+    setSegundos(0);
+    const relogio = setInterval(() => setSegundos((s) => s + 1), 1000);
+    return () => clearInterval(relogio);
+  }, [generating]);
 
   useFocusEffect(
     useCallback(() => {
@@ -62,7 +71,7 @@ export default function ChatScreen() {
     const stamp = Date.now();
     const doUsuario: Message = { id: String(stamp), from: "user", text: resposta };
 
-    // Só aceita o que o backend reconhece como objetivo: "gere" não vira nome de treino
+    // Barra só o que claramente não é objetivo ("gere", "oi"); o resto a IA interpreta
     if (!ehObjetivo(resposta)) {
       setMessages((atuais) => [
         ...atuais,
@@ -70,7 +79,7 @@ export default function ChatScreen() {
         {
           id: String(stamp + 1),
           from: "coach",
-          text: "Não entendi isso como um objetivo. Escolha uma das opções ou escreva algo como “emagrecer”, “ganhar massa” ou “mais força”.",
+          text: "Não entendi isso como um objetivo. Me conta o que você quer alcançar, por exemplo “pular mais alto”, “perder barriga” ou “ganhar massa”, ou escolha uma das opções.",
         },
       ]);
       return;
@@ -92,24 +101,29 @@ export default function ChatScreen() {
     ]);
   }
 
+  function falarCoach(text: string) {
+    setMessages((atuais) => [...atuais, { id: `coach-${Date.now()}`, from: "coach", text }]);
+  }
+
   async function generate() {
-    if (!objetivo) return;
+    if (!objetivo || generating) return;
     setGenerating(true);
     setError(null);
-    // A geração leva até 2 min: com a tela apagada o Android corta a rede do app
-    activateKeepAwakeAsync("gerando-treino").catch(() => {});
+    // Retorno imediato: sem ele, os segundos de espera pareciam um botão que não faz nada
+    falarCoach("Montando seu treino com a IA… Leva de 10 segundos a 1 minuto. Deixe o app aberto.");
     try {
+      // A geração pode levar até 2 min: com a tela apagada o Android corta a rede do app
+      manterTelaAcesa("gerando-treino");
       const payload = { ...(await getProfile()), objetivo };
       const workout = workoutFromGeneratedDays(await generateWorkout(payload));
       await saveLastWorkout(workout);
       router.push({ pathname: "/workout-detail", params: { workoutId: workout.id } });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Não foi possível gerar o treino.");
+      const mensagem = cause instanceof Error ? cause.message : "Não foi possível gerar o treino.";
+      setError(mensagem);
+      falarCoach(`Não consegui gerar o treino: ${mensagem}`);
     } finally {
-      // Lança se a tela nunca chegou a ficar travada acesa (ex.: no navegador)
-      try {
-        deactivateKeepAwake("gerando-treino").catch(() => {});
-      } catch {}
+      liberarTela("gerando-treino");
       setGenerating(false);
     }
   }
@@ -171,7 +185,7 @@ export default function ChatScreen() {
               </View>
               {error && <Text style={styles.error}>{error}</Text>}
               <PrimaryButton
-                label={generating ? "Gerando…" : "Gerar treino"}
+                label={generating ? `Gerando… ${segundos}s` : "Gerar treino"}
                 onPress={generate}
                 disabled={generating}
                 icon={<MaterialIcons name="auto-awesome" size={18} color={brand.onLime} />}

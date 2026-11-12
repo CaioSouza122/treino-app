@@ -1,5 +1,4 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -12,6 +11,7 @@ import { brand, font, radius, type } from "@/constants/brand";
 import { haptic } from "@/lib/haptics";
 import { preferencias } from "@/lib/preferences";
 import { parseSession, type Exercise, type Session } from "@/lib/parse-workout";
+import { liberarTela, manterTelaAcesa } from "@/lib/tela-acesa";
 import { dayKey, getLogs, lastLoadBefore, logId, removeLog, upsertLog, type ProgressLog } from "@/lib/progress";
 import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
 
@@ -30,10 +30,8 @@ export default function WorkoutDetailScreen() {
   useEffect(() => {
     if (!preferencias().telaLigada) return;
     const tag = "treino-aberto";
-    activateKeepAwakeAsync(tag).catch(() => {});
-    return () => {
-      void deactivateKeepAwake(tag);
-    };
+    manterTelaAcesa(tag);
+    return () => liberarTela(tag);
   }, []);
 
   useEffect(() => {
