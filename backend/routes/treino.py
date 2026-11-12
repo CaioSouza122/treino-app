@@ -99,9 +99,11 @@ async def gerar_treino(
         raise HTTPException(
             status_code=500, detail="Não foi possível gerar o treino. Tente novamente."
         )
+    motivo = None
     if fonte == "reserva":
         # Só um código (ex.: api_recusou_a_chave_http_401): diagnostica a produção sem o log
-        response.headers["X-Motivo-Reserva"] = motivo_reserva.get() or "desconhecido"
+        motivo = (motivo_reserva.get() or "desconhecido")[:200]
+        response.headers["X-Motivo-Reserva"] = motivo
 
     # 2. Tenta salvar no PostgreSQL de forma resiliente
     try:
@@ -109,7 +111,7 @@ async def gerar_treino(
         usuario = await _gravar_perfil(db, conta.id, dados)
 
         # Cria a sessão de Treino
-        novo_treino = Workout(user_id=usuario.id, fonte=fonte)
+        novo_treino = Workout(user_id=usuario.id, fonte=fonte, motivo=motivo)
         db.add(novo_treino)
         await db.flush()
 

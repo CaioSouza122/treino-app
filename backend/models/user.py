@@ -36,6 +36,8 @@ class Workout(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     # "ia" (gerado pelo Gemini) ou "reserva" (modelo local, quando a IA está indisponível)
     fonte = Column(String(20), nullable=False, default="ia", server_default="ia")
+    # Só na reserva: código de por que a IA não respondeu, para o app mostrar depois
+    motivo = Column(String(200), nullable=True)
 
     # Relacionamentos
     user = relationship("User", back_populates="workouts")

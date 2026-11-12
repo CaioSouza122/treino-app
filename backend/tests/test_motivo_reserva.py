@@ -94,3 +94,17 @@ async def test_limite_fora_da_api(monkeypatch):
     r = await _gerar()
 
     assert r.headers["X-Motivo-Reserva"].endswith("origem=fora_da_api")
+
+
+@pytest.mark.asyncio
+async def test_motivo_fica_no_historico(monkeypatch):
+    """O app mostra o código também ao abrir o treino depois, pela aba Treinos."""
+    _api_responde(monkeypatch, 429, {"detalhe": "30 per 1 minute"})
+
+    async with cliente() as c:
+        h = await cadastrar(c)
+        await c.post("/gerar-treino-ia", json=PERFIL, headers=h)
+        historico = (await c.get("/historico", headers=h)).json()
+
+    assert historico[0]["fonte"] == "reserva"
+    assert historico[0]["motivo"].startswith("api_com_limite_de_uso_http_429")
