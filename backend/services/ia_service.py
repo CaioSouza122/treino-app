@@ -386,7 +386,14 @@ async def _chamar_api_externa(dados, prazo: float | None = None):
         return _falhou("timeout")
     except httpx.HTTPStatusError as e:
         print(f"[ERRO] Erro HTTP {e.response.status_code}: {e.response.text}")
-        return _falhou(f"api_respondeu_http_{e.response.status_code}")
+        # A API_Treino diz o código do Gemini (ex.: gemini_http_400 = chave recusada)
+        try:
+            codigo = re.sub(r"[^0-9a-z_]", "", str(e.response.json().get("codigo") or ""))[:40]
+        except (ValueError, AttributeError):
+            codigo = ""
+        return _falhou(
+            f"api_respondeu_http_{e.response.status_code}" + (f" {codigo}" if codigo else "")
+        )
     except Exception as e:
         print(f"[ERRO] Erro inesperado ao chamar API externa: {type(e).__name__}: {e}")
         return _falhou(f"erro_inesperado_{type(e).__name__}")

@@ -43,6 +43,26 @@ async def test_chave_recusada_aparece_no_cabecalho(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_chave_do_gemini_recusada_na_api_aparece_sem_retry(monkeypatch):
+    chamadas = []
+    post_original = httpx.AsyncClient.post
+
+    async def post(self, url, **kwargs):
+        if str(url) != f"{ia_service.TREINO_API_URL}/treino":
+            return await post_original(self, url, **kwargs)
+        chamadas.append(url)
+        corpo = {"codigo": "gemini_http_400"}
+        return httpx.Response(500, json=corpo, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+
+    r = await _gerar()
+
+    assert r.headers["X-Motivo-Reserva"] == "api_respondeu_http_500 gemini_http_400"
+    assert len(chamadas) == 1
+
+
+@pytest.mark.asyncio
 async def test_chave_ausente_e_informada(monkeypatch):
     monkeypatch.setattr(ia_service, "TREINO_API_KEY", "")
     _api_responde(monkeypatch, 401)
