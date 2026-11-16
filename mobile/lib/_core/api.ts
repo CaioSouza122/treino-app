@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { encerrarSessao, getToken } from "@/lib/session";
 
 // No Render, acordar o backend (~40s), acordar a API de IA (~30s) e gerar o treino (~25s)
-// somam mais de 90s no primeiro pedido; o backend dá à IA até 110s, somadas as tentativas.
+// somam mais de 90s no primeiro pedido; o backend dá à IA até 90s, somadas as tentativas.
 const TIMEOUT_MS = 150_000;
 
 export function getApiBaseUrl(): string {
