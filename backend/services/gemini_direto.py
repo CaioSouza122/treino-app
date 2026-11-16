@@ -20,7 +20,7 @@ _URL = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generat
 # Sobrecarga ou limite: vale tentar o próximo modelo
 _ERROS_TEMPORARIOS = (429, 500, 503)
 # A geração leva ~10-25s; sobra prazo para a API_Treino se o Google falhar
-PRAZO_GEMINI = 60.0
+PRAZO_GEMINI = 45.0
 
 
 def ativo() -> bool:

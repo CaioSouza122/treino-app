@@ -275,7 +275,8 @@ _PAUSAS = (5, 10, 15)
 # Prazo de todas as tentativas somadas. O app desiste em 150s; sem um prazo total, 4
 # tentativas de até 100s cada (Gemini sobrecarregado demora e depois devolve 502)
 # passavam de 5 minutos e o usuário via "o servidor demorou demais" em vez do treino.
-PRAZO_IA = 110.0
+# 90s + ~45s do backend acordando no Render cabem nos 150s do app (110s estourava).
+PRAZO_IA = 90.0
 # Abaixo disso não vale começar outra tentativa: o Gemini sozinho leva ~25s
 _MINIMO_POR_TENTATIVA = 30.0
 

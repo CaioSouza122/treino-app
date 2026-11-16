@@ -41,8 +41,12 @@ export default function WorkoutDetailScreen() {
         const local = await getLastWorkout();
         const history = await getWorkoutHistory().catch(() => []);
         // O histórico do servidor traz a fonte e o motivo da reserva; o treino local é o
-        // plano B sem internet
-        const selected = history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
+        // plano B sem internet. Treino recém-gerado tem id "local-…", que nunca está no histórico:
+        // cair em history[0] mostrava um treino antigo quando a gravação no servidor falhava.
+        const recemGerado = params.workoutId?.startsWith("local-") && local?.id === params.workoutId;
+        const selected = recemGerado
+          ? local
+          : history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
         const savedLogs = await getLogs();
         if (!active) return;
         setLogs(savedLogs);
