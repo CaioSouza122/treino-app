@@ -8,6 +8,8 @@ import { brand, font } from "@/constants/brand";
 const tabs = [
   { name: "index", title: "Coach", icon: "auto-awesome" },
   { name: "plans", title: "Treinos", icon: "fitness-center" },
+  { name: "graficos", title: "Gráficos", icon: "insights" },
+  { name: "perfil", title: "Perfil", icon: "person" },
 ] as const;
 
 export default function TabLayout() {

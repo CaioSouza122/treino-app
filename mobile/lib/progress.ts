@@ -129,6 +129,50 @@ export function adherence(weeks: WeekStat[]): number {
   return Math.round((done / planned) * 100);
 }
 
+/* ── Voltagem: a sequência de treinos do app ────────────────────────────── */
+
+/**
+ * Dias de treino seguidos (qualquer exercício marcado conta), contando de hoje para trás.
+ * Um dia de descanso não quebra a sequência; dois dias seguidos sem treino, sim.
+ */
+export function voltagem(logs: ProgressLog[], hoje: Date = new Date()): number {
+  const dias = new Set(logs.map((log) => log.date));
+  const dia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  let total = 0;
+  let faltas = 0;
+  while (faltas < 2) {
+    if (dias.has(dayKey(dia))) {
+      total++;
+      faltas = 0;
+    } else {
+      faltas++;
+    }
+    dia.setDate(dia.getDate() - 1);
+  }
+  return total;
+}
+
+const NIVEIS = [
+  { min: 0, nome: "Desligado" },
+  { min: 1, nome: "Faísca" },
+  { min: 3, nome: "Corrente" },
+  { min: 7, nome: "Alta voltagem" },
+  { min: 14, nome: "Sobrecarga" },
+  { min: 30, nome: "Usina" },
+];
+
+/** Nome do nível atual e quantos dias faltam para o próximo (null no último). */
+export function nivelVoltagem(volts: number): { nome: string; faltam: number | null; proximo: string | null } {
+  const indice = NIVEIS.filter((nivel) => volts >= nivel.min).length - 1;
+  const proximo = NIVEIS[indice + 1];
+  return { nome: NIVEIS[indice].nome, faltam: proximo ? proximo.min - volts : null, proximo: proximo?.nome ?? null };
+}
+
+/** Dias em que algum exercício foi marcado. */
+export function diasTreinados(logs: ProgressLog[]): number {
+  return new Set(logs.map((log) => log.date)).size;
+}
+
 /* ── Progressão de carga ────────────────────────────────────────────────── */
 
 export type TrackedExercise = { key: string; name: string; count: number };

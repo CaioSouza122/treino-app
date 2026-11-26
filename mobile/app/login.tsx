@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,7 +15,7 @@ import { BrandMark, Wordmark } from "@/components/brand-mark";
 import { PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
 import { Label } from "@/components/ui";
-import { brand, font, radius, type } from "@/constants/brand";
+import { brand, radius, type } from "@/constants/brand";
 import { criarConta, entrar } from "@/lib/auth-api";
 import { haptic } from "@/lib/haptics";
 import { getToken } from "@/lib/session";
@@ -92,7 +90,7 @@ export default function LoginScreen() {
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.fill}>
+      <KeyboardAvoidingView behavior="padding" style={styles.fill}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.brandArea}>
             <BrandMark size={84} />
@@ -136,18 +134,6 @@ export default function LoginScreen() {
               onPress={trocarModo}
               disabled={enviando}
             />
-          </View>
-
-          <View style={styles.orLine}>
-            <View style={styles.line} />
-            <Label>em breve</Label>
-            <View style={styles.line} />
-          </View>
-
-          {/* Google, Apple e recuperação de senha dependem de credenciais dos provedores e de envio de e-mail */}
-          <View style={styles.socials}>
-            <SocialButton label="Continuar com Google" />
-            <SocialButton label="Continuar com Apple" />
           </View>
 
           <Text style={styles.terms}>
@@ -201,15 +187,6 @@ function Field({
   );
 }
 
-function SocialButton({ label }: { label: string }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: true }} disabled style={[styles.socialButton, styles.socialDisabled]}>
-      <Text style={styles.socialText}>{label}</Text>
-      <Text style={styles.soon}>em breve</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   loading: { alignItems: "center", flex: 1, justifyContent: "center" },
@@ -220,13 +197,6 @@ const styles = StyleSheet.create({
   input: { backgroundColor: brand.surface, borderColor: brand.borderStrong, borderRadius: radius.md, borderWidth: 1, color: brand.text, fontSize: 16, height: 54, paddingHorizontal: 16 },
   erro: { alignItems: "center", flexDirection: "row", gap: 8 },
   erroTexto: { color: brand.danger, flex: 1, fontSize: 13 },
-  orLine: { alignItems: "center", flexDirection: "row", gap: 14 },
-  line: { backgroundColor: brand.border, flex: 1, height: 1 },
-  socials: { gap: 10 },
-  socialButton: { alignItems: "center", borderColor: brand.border, borderRadius: radius.md, borderWidth: 1, flexDirection: "row", height: 52, justifyContent: "space-between", paddingHorizontal: 18 },
-  socialDisabled: { opacity: 0.5 },
-  socialText: { color: brand.text, fontFamily: font.displayMedium, fontSize: 14, letterSpacing: 0.3 },
-  soon: { ...type.caption, textTransform: "uppercase" },
   terms: { ...type.caption, textAlign: "center" },
   termsLink: { color: brand.text },
 });
