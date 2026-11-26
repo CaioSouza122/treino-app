@@ -6,8 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { brand, font } from "@/constants/brand";
 
 const tabs = [
-  { name: "index", title: "Hoje", icon: "bolt" },
-  { name: "chat", title: "IA", icon: "auto-awesome" },
+  { name: "index", title: "Coach", icon: "auto-awesome" },
   { name: "plans", title: "Treinos", icon: "fitness-center" },
 ] as const;
 

@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Entrance } from "@/components/entrance";
@@ -8,7 +8,7 @@ import { PrimaryButton } from "@/components/primary-button";
 import { ScreenContainer } from "@/components/screen-container";
 import { Label, SectionHead } from "@/components/ui";
 import { brand, font, radius, type } from "@/constants/brand";
-import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
+import { getWorkoutHistory, type Workout } from "@/lib/workouts-api";
 
 export default function PlansScreen() {
   const router = useRouter();
@@ -16,27 +16,23 @@ export default function PlansScreen() {
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      let history: Workout[] = [];
-      try {
-        history = await getWorkoutHistory();
-      } catch {
-        if (active) setOffline(true);
-      }
-      const local = await getLastWorkout();
-      if (!active) return;
-      setWorkouts(history.length ? history : local ? [local] : []);
-      setLoading(false);
-    }
-
-    load();
-    return () => {
-      active = false;
-    };
-  }, []);
+  // Recarrega ao voltar para a aba: o treino recém-criado no chat precisa aparecer aqui
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getWorkoutHistory()
+        .then((history) => {
+          if (!active) return;
+          setWorkouts(history);
+          setOffline(false);
+        })
+        .catch(() => active && setOffline(true))
+        .finally(() => active && setLoading(false));
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   const current = workouts[0];
   const open = (id: string) => router.push({ pathname: "/workout-detail", params: { workoutId: id } });
@@ -54,7 +50,7 @@ export default function PlansScreen() {
         {offline && (
           <View style={styles.notice}>
             <MaterialIcons name="cloud-off" size={16} color={brand.muted} />
-            <Text style={styles.noticeText}>Sem conexão com o servidor. Mostrando o último treino salvo no aparelho.</Text>
+            <Text style={styles.noticeText}>Sem conexão com o servidor. Confira a internet e volte a esta aba.</Text>
           </View>
         )}
 
@@ -62,7 +58,7 @@ export default function PlansScreen() {
         {!loading && !current && (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>Nenhum treino ainda</Text>
-            <Text style={styles.feedback}>Gere seu primeiro plano com a IA e ele aparece aqui.</Text>
+            <Text style={styles.feedback}>Peça um treino ao Coach IA e ele aparece aqui.</Text>
           </View>
         )}
 
@@ -74,7 +70,7 @@ export default function PlansScreen() {
                 <Text style={styles.date}>{new Date(current.created_at).toLocaleDateString("pt-BR")}</Text>
               </View>
               <Text style={styles.currentTitle}>{current.days[0]?.foco || "Treino personalizado"}</Text>
-              <Text style={styles.currentSub}>{current.days.length} dias por semana · {current.fonte === "reserva" ? "treino padrão" : "gerado pela IA"}</Text>
+              <Text style={styles.currentSub}>{current.days.length} dias por semana</Text>
             </Pressable>
           </Entrance>
         )}
@@ -106,7 +102,7 @@ export default function PlansScreen() {
         <PrimaryButton
           label="Novo treino com IA"
           variant="secondary"
-          onPress={() => router.push("/(tabs)/chat" as never)}
+          onPress={() => router.push("/")}
           icon={<MaterialIcons name="auto-awesome" size={18} color={brand.cyan} />}
         />
       </ScrollView>

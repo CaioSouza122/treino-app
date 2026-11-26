@@ -3,15 +3,15 @@ import { router } from "expo-router";
 
 import { encerrarSessao, getToken } from "@/lib/session";
 
-// No Render, acordar o backend (~40s), acordar a API de IA (~30s) e gerar o treino (~25s)
-// somam mais de 90s no primeiro pedido; o backend dá à IA até 90s, somadas as tentativas.
+// No Render, acordar o backend (~40s) e a resposta da IA (até 45s, com novas tentativas)
+// somam perto de 90s no primeiro pedido.
 const TIMEOUT_MS = 150_000;
 
 export function getApiBaseUrl(): string {
   return (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
 }
 
-// FastAPI responde { detail: string | [{ msg }] }; a API Flask responde { erro } ou { erros_validacao }.
+// FastAPI responde { detail: string | [{ msg }] }.
 function extractErrorMessage(body: any): string | null {
   if (!body || typeof body !== "object") return null;
   const { detail } = body;
@@ -33,7 +33,7 @@ const PAUSA_REDE_MS = 3_000;
 
 class SemRede extends Error {}
 
-/** Como apiCall, mas devolve também os cabeçalhos (ex.: X-Motivo-Reserva). */
+/** Como apiCall, mas devolve também os cabeçalhos da resposta. */
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
