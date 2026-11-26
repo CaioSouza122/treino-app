@@ -69,7 +69,5 @@ jobs:
         env:
           # Sem DATABASE_URL, o backend usa SQLite local automaticamente
           DATABASE_URL: ""
-          TREINO_API_URL: "http://localhost:5000/api/v1"
-          TREINO_API_KEY: ""
           PYTHONPATH: "."
         run: pytest -v --tb=short

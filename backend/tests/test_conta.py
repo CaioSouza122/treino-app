@@ -2,27 +2,9 @@
 
 import pytest
 
-from services import ia_service
-from tests.conftest import cadastrar, cliente
+from tests.conftest import CHAT, cadastrar, cliente
 
-PERFIL = {
-    "altura": 175,
-    "peso": 80,
-    "idade": 28,
-    "vezes_por_semana": 3,
-    "objetivo": "hipertrofia",
-    "tempo": 60,
-    "nivel": "intermediario",
-}
 SENHA = "senha-forte-123"
-
-
-@pytest.fixture(autouse=True)
-def api_externa_offline(monkeypatch):
-    async def offline(dados):
-        return None
-
-    monkeypatch.setattr(ia_service, "_chamar_api_externa", offline)
 
 
 @pytest.mark.asyncio
@@ -76,7 +58,7 @@ async def test_nova_senha_curta_e_recusada():
 async def test_excluir_conta_apaga_conta_e_historico():
     async with cliente() as c:
         headers = await cadastrar(c, email="sai@teste.com", senha=SENHA)
-        assert (await c.post("/gerar-treino-ia", json=PERFIL, headers=headers)).status_code == 200
+        assert (await c.post("/chat", json=CHAT, headers=headers)).status_code == 200
 
         errada = await c.request(
             "DELETE", "/auth/conta", json={"senha": "errada-123"}, headers=headers

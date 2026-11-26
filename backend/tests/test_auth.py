@@ -2,27 +2,8 @@
 
 import pytest
 
-from services import ia_service
 from services.auth_service import criar_token, gerar_hash_senha, ler_token, verificar_senha
-from tests.conftest import cadastrar, cliente
-
-PERFIL = {
-    "altura": 175,
-    "peso": 80,
-    "idade": 28,
-    "vezes_por_semana": 3,
-    "objetivo": "hipertrofia",
-    "tempo": 60,
-    "nivel": "intermediario",
-}
-
-
-@pytest.fixture(autouse=True)
-def api_externa_offline(monkeypatch):
-    async def offline(dados):
-        return None
-
-    monkeypatch.setattr(ia_service, "_chamar_api_externa", offline)
+from tests.conftest import CHAT, cadastrar, cliente
 
 
 def test_hash_de_senha_confere_e_nao_guarda_a_senha():
@@ -106,9 +87,9 @@ async def test_cadastro_invalido_retorna_422(corpo):
 )
 async def test_rotas_de_treino_exigem_login(headers):
     async with cliente() as c:
-        gerar = await c.post("/gerar-treino-ia", json=PERFIL, headers=headers)
+        chat = await c.post("/chat", json=CHAT, headers=headers)
         historico = await c.get("/historico", headers=headers)
-    assert gerar.status_code == historico.status_code == 401
+    assert chat.status_code == historico.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -116,7 +97,7 @@ async def test_historico_e_separado_por_conta():
     async with cliente() as c:
         conta_a = await cadastrar(c)
         conta_b = await cadastrar(c)
-        assert (await c.post("/gerar-treino-ia", json=PERFIL, headers=conta_a)).status_code == 200
+        assert (await c.post("/chat", json=CHAT, headers=conta_a)).status_code == 200
         historico_a = (await c.get("/historico", headers=conta_a)).json()
         historico_b = (await c.get("/historico", headers=conta_b)).json()
     assert len(historico_a) == 1
