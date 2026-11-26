@@ -16,11 +16,7 @@ services:
         value: 3.12.7
       - key: DATABASE_URL # connection string do Neon (?sslmode=require)
         sync: false
-      - key: TREINO_API_URL
-        value: https://api-treino-ygh4.onrender.com/api/v1
-      - key: TREINO_API_KEY # mesmo valor de API_AUTH_KEY na API_Treino
-        sync: false
-      - key: GEMINI_API_KEY # mesma chave do Gemini da API_Treino; chamada direta ao Google
+      - key: GEMINI_API_KEY # chave do Google Gemini usada pelo Coach IA
         sync: false
       - key: ALLOWED_ORIGINS # URL do app web abaixo, ex: https://hipertrofia-web.onrender.com
         sync: false

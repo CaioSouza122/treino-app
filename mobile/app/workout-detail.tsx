@@ -13,7 +13,7 @@ import { preferencias } from "@/lib/preferences";
 import { parseSession, type Exercise, type Session } from "@/lib/parse-workout";
 import { liberarTela, manterTelaAcesa } from "@/lib/tela-acesa";
 import { dayKey, getLogs, lastLoadBefore, logId, removeLog, upsertLog, type ProgressLog } from "@/lib/progress";
-import { getLastWorkout, getWorkoutHistory, type Workout } from "@/lib/workouts-api";
+import { getWorkoutHistory, type Workout } from "@/lib/workouts-api";
 
 export default function WorkoutDetailScreen() {
   const params = useLocalSearchParams<{ workoutId?: string }>();
@@ -38,15 +38,9 @@ export default function WorkoutDetailScreen() {
     let active = true;
     async function load() {
       try {
-        const local = await getLastWorkout();
-        const history = await getWorkoutHistory().catch(() => []);
-        // O histórico do servidor traz a fonte e o motivo da reserva; o treino local é o
-        // plano B sem internet. Treino recém-gerado tem id "local-…", que nunca está no histórico:
-        // cair em history[0] mostrava um treino antigo quando a gravação no servidor falhava.
-        const recemGerado = params.workoutId?.startsWith("local-") && local?.id === params.workoutId;
-        const selected = recemGerado
-          ? local
-          : history.find((item: Workout) => item.id === params.workoutId) ?? history[0] ?? local;
+        const history = await getWorkoutHistory();
+        // Sem id abre o mais recente; com id, nunca troca por outro treino
+        const selected = params.workoutId ? history.find((item: Workout) => item.id === params.workoutId) : history[0];
         const savedLogs = await getLogs();
         if (!active) return;
         setLogs(savedLogs);
@@ -148,20 +142,9 @@ export default function WorkoutDetailScreen() {
       <View style={styles.fill}>
         <ScreenHeader
           title={sessions[0]?.subtitle || "Treino personalizado"}
-          subtitle={`${workout.fonte === "reserva" ? "Treino padrão" : "Gerado pela IA"} · ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`}
+          subtitle={`Gerado pela IA · ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`}
         />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* A IA estava fora do ar: avisa em vez de fingir que o plano é personalizado */}
-          {workout.fonte === "reserva" && (
-            <View style={styles.reserva}>
-              <MaterialIcons name="cloud-off" size={18} color={brand.cyan} />
-              <Text style={styles.reservaTexto}>
-                A IA estava indisponível, então montamos um treino padrão para o seu objetivo. Gere de novo em
-                alguns minutos para receber o plano personalizado.
-                {workout.motivo ? `\nCódigo: ${workout.motivo}` : ""}
-              </Text>
-            </View>
-          )}
           {/* ── Resumo ─────────────────────────────────────────────── */}
           <View style={styles.summary}>
             <Summary value={String(sessions.length)} unit="dias" />
@@ -332,8 +315,6 @@ function ExerciseRow({
 }
 
 const styles = StyleSheet.create({
-  reserva: { alignItems: "flex-start", backgroundColor: brand.cyanSoft, borderColor: brand.cyan, borderRadius: radius.md, borderWidth: 1, flexDirection: "row", gap: 10, padding: 14 },
-  reservaTexto: { color: brand.text, flex: 1, fontSize: 13, lineHeight: 19 },
   fill: { flex: 1 },
   center: { alignItems: "center", flex: 1, justifyContent: "center", padding: 24 },
   message: { ...type.caption, fontSize: 15, textAlign: "center" },

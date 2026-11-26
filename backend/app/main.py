@@ -5,13 +5,12 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import models.user  # noqa: F401 — garante que os modelos são importados
 from database.connection import engine
 from routes import auth, treino
-from services.ia_service import acordar_api_ia
 
 _BACKEND = Path(__file__).resolve().parent.parent
 
@@ -46,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HIPERTROF.IA — API",
-    description="Backend de geração de treinos personalizados com Inteligência Artificial.",
+    description="Backend do Coach IA de treino e saúde.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -67,8 +66,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # O app web lê o motivo da reserva na resposta de /gerar-treino-ia
-    expose_headers=["X-Motivo-Reserva"],
 )
 
 app.include_router(auth.router)
@@ -82,10 +79,6 @@ def home():
 
 
 @app.get("/acordar", tags=["Health"])
-async def acordar(tarefas: BackgroundTasks):
-    """
-    O app chama ao abrir: este backend já acordou para responder, e a API de IA acorda em
-    segundo plano. Responde na hora, sem esperar a IA.
-    """
-    tarefas.add_task(acordar_api_ia)
+def acordar():
+    """O app chama ao abrir: no Render free o backend dorme e leva ~40s para acordar."""
     return {"status": "ok"}

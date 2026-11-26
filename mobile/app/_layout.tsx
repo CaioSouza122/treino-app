@@ -37,14 +37,13 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="workout-detail" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
-          <Stack.Screen name="profile" options={{ animation: "fade", contentStyle: { backgroundColor: "transparent" }, presentation: "transparentModal" }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
-/** Sem sessão, qualquer tela além do login volta para /login. /dev/* só existe em desenvolvimento. */
+/** Sem sessão, qualquer tela além do login volta para /login. */
 function useGuardaDeRotas() {
   const router = useRouter();
   const segments = useSegments() as string[];
@@ -54,10 +53,6 @@ function useGuardaDeRotas() {
 
   useEffect(() => {
     if (!navegacaoPronta) return;
-    if (segments[0] === "dev" && !__DEV__) {
-      router.replace("/");
-      return;
-    }
     if (telaDeLogin) return;
     getToken()
       .then((token) => {

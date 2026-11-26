@@ -15,11 +15,11 @@ class User(Base):
     __tablename__ = "app_usuarios"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    altura = Column(Float, nullable=False)
-    peso = Column(Float, nullable=False)
-    idade = Column(Integer, nullable=False)
-    vezes_por_semana = Column(Integer, nullable=False)
-    objetivo = Column(String, nullable=False)
+    altura = Column(Float)
+    peso = Column(Float)
+    idade = Column(Integer)
+    vezes_por_semana = Column(Integer)
+    objetivo = Column(String)
     nivel = Column(String, default="intermediario")
     tempo = Column(Integer, default=30)
     created_at = Column(DateTime, default=datetime.utcnow)

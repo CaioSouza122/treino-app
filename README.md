@@ -20,28 +20,22 @@
 
 ## Sobre o projeto
 
-O **HIPERTROF.IA** é um app mobile full-stack que gera planos de treino personalizados com o
-**Google Gemini**. O usuário informa idade, peso, altura, objetivo, nível, frequência semanal e
-tempo por sessão, e recebe um plano dividido em dias (Treino A, B, C...).
+O **HIPERTROF.IA** é um app mobile com um **Coach IA** (Google Gemini) que conversa como um
+personal trainer: monta treinos, ajusta o plano e tira dúvidas sobre exercícios, alimentação,
+sono e recuperação. A IA só responde sobre treino e saúde; outros assuntos ela recusa.
 
-No app, o próximo treino aparece em destaque na tela inicial, com gráficos de frequência e de
-evolução de força. O usuário marca os exercícios conforme avança e anota a carga de cada um.
-
-Se a IA estiver indisponível, o backend monta um **treino de reserva** a partir de modelos
-locais, então o usuário sempre recebe um plano.
+Quando o Coach entrega um plano (Treino A, B, C...), ele é salvo na aba **Treinos**, onde o
+usuário marca os exercícios conforme avança e anota a carga de cada um. Se o Gemini estiver
+sobrecarregado, o chat avisa e pede para tentar de novo em 1 minuto.
 
 ### Como as peças se ligam
 
 ```
-App (Expo) ──POST /gerar-treino-ia──▶ Backend FastAPI ──POST /api/v1/treino──▶ API_Treino (Flask) ──▶ Gemini
-     ▲                                   │   (X-API-KEY)                          (repositório próprio)
-     └────── dias do treino (JSON) ──────┤
-                                         └──▶ Neon / SQLite: perfil + histórico
+App (Expo) ──POST /chat──▶ Backend FastAPI ──▶ Google Gemini
+     ▲                         │
+     └── resposta + treino_id ─┤
+                               └──▶ Neon / SQLite: contas + treinos
 ```
-
-A **[API_Treino](https://github.com/CaioSouza122/API_Treino)** é um serviço separado. Ela só
-aceita chamadas com a chave `X-API-KEY`, e o backend envia o mesmo valor configurado em
-`TREINO_API_KEY`.
 
 ---
 
@@ -49,19 +43,12 @@ aceita chamadas com a chave `X-API-KEY`, e o backend envia o mesmo valor configu
 
 | Funcionalidade | Status |
 |---|---|
-| 🤖 Geração de treino via IA com o perfil completo | ✅ |
-| 💬 Objetivo perguntado pelo Coach IA (atalhos ou texto livre) | ✅ |
-| 🏷️ Aviso quando o treino veio da reserva local (IA indisponível) | ✅ |
-| 🔄 Treino de reserva local quando a IA falha | ✅ |
-| 🏋️ Próximo treino em destaque e plano da semana | ✅ |
-| ✅ Checklist de exercícios com progresso salvo no dia | ✅ |
-| 📈 Registro de carga, gráficos de frequência e de evolução de força | ✅ |
+| 💬 Chat com o Coach IA (treino e saúde, outros assuntos recusados) | ✅ |
+| 🏋️ Plano montado no chat salvo na aba Treinos | ✅ |
+| ✅ Checklist de exercícios e registro de carga | ✅ |
 | 🔐 Login com e-mail e senha (cadastro, sessão de 30 dias, sair) | ✅ |
 | ⚙️ Configurações: editar nome, trocar senha, excluir conta, tela ligada no treino, vibração, apagar progresso, status do servidor | ✅ |
 | ☁️ Histórico de treinos no PostgreSQL (Neon), por conta | ✅ |
-| 💬 Coach IA em conversa | 🚧 Prévia: respostas ainda são fixas |
-| 🔑 Login com Google/Apple · recuperar senha | 🔜 |
-| ⏱️ Timer de descanso · 🔔 Lembretes | 🔜 |
 
 ---
 
@@ -72,19 +59,19 @@ treino-app/
 ├── backend/                  # API REST (FastAPI)
 │   ├── app/main.py           # Aplicação, CORS e ciclo de vida
 │   ├── routes/auth.py        # /auth/cadastro, /auth/login, /auth/me
-│   ├── routes/treino.py      # /gerar-treino-ia e /historico (exigem login)
+│   ├── routes/treino.py      # /chat e /historico (exigem login)
 │   ├── services/auth_service.py # Hash de senha (scrypt) e tokens JWT
-│   ├── services/ia_service.py# Chamada à API_Treino, conversão em dias, treino de reserva
+│   ├── services/ia.py        # Conversa com o Gemini (regras do Coach) e recorte do plano em dias
 │   ├── models/user.py        # Tabelas app_usuarios, app_treinos, app_treino_dias
 │   ├── schemas/              # Validação de entrada e formato de saída (Pydantic v2)
 │   ├── database/connection.py# Engine async (Neon via asyncpg ou SQLite)
 │   ├── migrations/           # Migrations versionadas (Alembic)
 │   └── tests/                # Pytest (a IA é sempre simulada)
 ├── mobile/                   # App (Expo + Expo Router)
-│   ├── app/                  # Telas: login, início, coach, treinos, detalhe, perfil
+│   ├── app/                  # Telas: login, coach (chat), treinos, detalhe, configurações
 │   ├── components/           # Componentes de interface
 │   ├── constants/brand.ts    # Tokens de design (cores, fontes, raios)
-│   └── lib/                  # Cliente da API, sessão (token), perfil, progresso
+│   └── lib/                  # Cliente da API, sessão (token), conversa, progresso
 ├── render.yaml               # Blueprint de deploy (backend + app web)
 ├── docker-compose.yml        # Backend + Postgres local para desenvolvimento
 └── Makefile                  # Atalhos (install, backend, mobile, migrate, test, lint)
@@ -96,7 +83,7 @@ treino-app/
 
 - **Backend:** FastAPI, SQLAlchemy 2 async, asyncpg, Alembic, Pydantic v2, httpx
 - **Mobile:** Expo, React Native, Expo Router, AsyncStorage, Chakra Petch (Expo Google Fonts)
-- **Infra:** Neon (PostgreSQL serverless), Render (backend, app web e API_Treino), Docker (opcional)
+- **Infra:** Neon (PostgreSQL serverless), Render (backend e app web), Docker (opcional)
 
 ---
 
@@ -113,7 +100,7 @@ venv\Scripts\activate            # Windows
 source venv/bin/activate         # Linux / Mac
 
 pip install -r requirements.txt -r requirements-dev.txt
-cp .env.example .env             # preencha TREINO_API_KEY
+cp .env.example .env             # preencha GEMINI_API_KEY
 alembic upgrade head             # cria/atualiza as tabelas
 uvicorn app.main:app --reload --port 8000
 ```
@@ -122,9 +109,8 @@ API em `http://localhost:8000`, documentação interativa em `http://localhost:8
 
 | Variável | Obrigatória | Descrição |
 | --- | --- | --- |
-| `TREINO_API_KEY` | Sim | Mesmo valor de `API_AUTH_KEY` na API_Treino. Sem ela, toda geração cai no treino de reserva. |
-| `GEMINI_API_KEY` | Recomendada | Chave do Gemini. O backend chama o Google direto e só usa a API_Treino se ele falhar (no Render free a borda às vezes responde 429 entre os serviços). |
-| `TREINO_API_URL` | Não | URL da API_Treino. Padrão: `https://api-treino-ygh4.onrender.com/api/v1`. |
+| `GEMINI_API_KEY` | Sim | Chave do Google Gemini usada pelo Coach IA. Sem ela o chat responde "Estou sobrecarregado agora". |
+| `GEMINI_MODELOS` | Não | Modelos tentados em ordem, separados por vírgula. Padrão: `gemini-2.5-flash,gemini-3.5-flash-lite`. |
 | `DATABASE_URL` | Não | Connection string do Neon. Vazio = SQLite local `treinoapp.db`. |
 | `ALLOWED_ORIGINS` | Não | Origens do app web para CORS, separadas por vírgula. Padrão: Expo web local (`:8081`). |
 | `JWT_SECRET` | Em produção | Assina os tokens de login. Trocar o valor desloga todo mundo. Sem ele (só em desenvolvimento) o backend usa um segredo temporário. |
@@ -171,8 +157,8 @@ make docker-up                   # backend com hot-reload + Postgres local
 | `GET` | `/auth/me` | ✔ | Dados da conta logada |
 | `PATCH` | `/auth/me` | ✔ | `{nome}` → altera o nome |
 | `POST` | `/auth/senha` | ✔ | `{senha_atual, nova_senha}` → `204`; senha atual errada → `400` |
-| `DELETE` | `/auth/conta` | ✔ | `{senha}` → `204`; apaga conta, perfil e todo o histórico |
-| `POST` | `/gerar-treino-ia` | ✔ | Gera o treino, salva no histórico da conta e devolve os dias |
+| `DELETE` | `/auth/conta` | ✔ | `{senha}` → `204`; apaga a conta e todo o histórico |
+| `POST` | `/chat` | ✔ | Conversa com o Coach IA; se a resposta traz um plano, ele é salvo no histórico |
 | `GET` | `/historico` | ✔ | 50 treinos mais recentes da conta |
 
 As rotas com login exigem o cabeçalho `Authorization: Bearer <token>`. O token vale 30 dias;
@@ -180,29 +166,24 @@ vencido ou inválido, a resposta é `401` e o app volta para a tela de login.
 Senhas têm no mínimo 8 caracteres e são guardadas só como hash `scrypt` com sal. O login responde
 igual para senha errada e e-mail inexistente, e aceita no máximo 10 tentativas por minuto por IP.
 
-`POST /gerar-treino-ia`:
+`POST /chat`:
 
 ```json
-{
-  "altura": 178, "peso": 80, "idade": 28,
-  "vezes_por_semana": 4, "tempo": 60,
-  "objetivo": "hipertrofia", "nivel": "Intermediário"
-}
+{ "mensagens": [{ "papel": "usuario", "texto": "Monta um treino de 4 dias para hipertrofia" }] }
 ```
 
-- Limites: altura 1–250, peso 20–400, idade 10–100, frequência 1–7, tempo 10–300 min,
-  objetivo 3–255 caracteres. Fora disso a resposta é `422`.
-- `nivel` aceita texto livre ("Avançado", "INICIANTE") e é convertido para o formato da API de IA.
-- No máximo 5 gerações por minuto por conta (`429` acima disso).
-- A resposta é uma lista `[{ "dia": "Treino A", "foco": "Peito e Tríceps", "exercicios": "..." }]`.
-- Erros vêm como `{"detail": "mensagem"}`, e o app mostra essa mensagem ao usuário.
+- `papel` é `usuario` ou `ia`; cada texto tem até 4000 caracteres. O backend usa as últimas 20.
+- Resposta: `{ "resposta": "...", "treino_id": "..." | null }`. `treino_id` vem quando a IA
+  entregou um plano no formato `Treino A: ...` + `- exercício — 3x10`, já salvo no histórico.
+- Gemini fora do ar ou sobrecarregado: `503` com `{"detail": "Estou sobrecarregado agora. Tente de novo em 1 minuto."}`.
+- No máximo 10 mensagens por minuto por conta (`429` acima disso).
 
 ---
 
 ## Testes e qualidade
 
 ```bash
-make test        # 50 testes do backend
+make test        # testes do backend (o Gemini é sempre simulado)
 make lint        # Ruff + ESLint + TypeScript
 ```
 
@@ -213,24 +194,23 @@ do mobile, a cada push e pull request.
 
 ## Deploy no Render + Neon
 
-1. **API_Treino:** faça o deploy primeiro (instruções no README dela) e anote o `API_AUTH_KEY`.
-2. **Neon:** crie o banco e copie a connection string (`postgresql://...?sslmode=require`).
-3. **Render:** *New → Blueprint* com este repositório. O `render.yaml` cria:
+1. **Neon:** crie o banco e copie a connection string (`postgresql://...?sslmode=require`).
+2. **Render:** *New → Blueprint* com este repositório. O `render.yaml` cria:
    - `hipertrofia-backend` — Python, `rootDir: backend`, start `alembic upgrade head && uvicorn ...`
    - `hipertrofia-web` — site estático gerado com `npx expo export -p web`
-4. Preencha no painel:
-   - backend: `DATABASE_URL`, `TREINO_API_KEY` e `ALLOWED_ORIGINS` (= URL do `hipertrofia-web`).
+3. Preencha no painel:
+   - backend: `DATABASE_URL`, `GEMINI_API_KEY` e `ALLOWED_ORIGINS` (= URL do `hipertrofia-web`).
      O `JWT_SECRET` é gerado pelo Render; se criar o serviço à mão, defina um valor longo e aleatório.
    - web: `EXPO_PUBLIC_API_BASE_URL` (= URL do `hipertrofia-backend`). O valor é embutido no
      build, então mudar a variável exige um novo deploy do site.
-5. Para os apps nativos, gere o build com EAS usando o mesmo `EXPO_PUBLIC_API_BASE_URL`.
+4. Para os apps nativos, gere o build com EAS usando o mesmo `EXPO_PUBLIC_API_BASE_URL`.
 
 A migration inicial só cria as tabelas que ainda não existem, então um banco que já estava em uso
 é adotado sem perder dados. O controle de versão fica em `alembic_version_backend`, separado do da
 API_Treino caso os dois usem o mesmo banco Neon.
 
-> No plano gratuito o Render desliga serviços parados: a primeira geração depois disso pode levar
-> perto de 40s (o backend acorda, a API_Treino acorda e o Gemini responde). O app espera até 90s.
+> No plano gratuito o Render desliga serviços parados: a primeira mensagem depois disso pode levar
+> perto de 60s (o backend acorda e o Gemini responde). O app espera até 150s.
 
 ---
 
