@@ -25,8 +25,13 @@ export type Mensagem = {
   erro?: boolean;
 };
 
-// Prefixo "treinoai": sair da conta apaga a conversa junto com o resto da sessão
-const CONVERSA_KEY = "treinoai:conversa";
+export type Conversa = { id: string; titulo: string; atualizado: number; mensagens: Mensagem[] };
+
+// Prefixo "treinoai": sair da conta apaga as conversas junto com o resto da sessão
+const CONVERSAS_KEY = "treinoai:conversas";
+// Versão anterior guardava uma conversa só
+const CONVERSA_ANTIGA_KEY = "treinoai:conversa";
+const MAX_CONVERSAS = 30;
 // O backend só usa as últimas mensagens como contexto
 const CONTEXTO = 20;
 
@@ -41,17 +46,46 @@ export async function conversar(
   return apiCall("/chat", { method: "POST", body: JSON.stringify({ mensagens }) });
 }
 
-export async function lerConversa(): Promise<Mensagem[]> {
+export function novaConversa(): Conversa {
+  return { id: `c-${Date.now()}`, titulo: "Nova conversa", atualizado: Date.now(), mensagens: [] };
+}
+
+/** Conversas guardadas no aparelho, da mais recente para a mais antiga. */
+export async function listarConversas(): Promise<Conversa[]> {
   try {
-    return JSON.parse((await AsyncStorage.getItem(CONVERSA_KEY)) ?? "[]") as Mensagem[];
+    const bruto = await AsyncStorage.getItem(CONVERSAS_KEY);
+    if (bruto) return JSON.parse(bruto) as Conversa[];
+    const antiga = JSON.parse((await AsyncStorage.getItem(CONVERSA_ANTIGA_KEY)) ?? "[]") as Mensagem[];
+    return antiga.length ? [{ ...novaConversa(), titulo: tituloDe(antiga), mensagens: antiga }] : [];
   } catch {
     return [];
   }
 }
 
-export async function salvarConversa(conversa: Mensagem[]): Promise<void> {
-  // Guarda só o fim da conversa para o armazenamento não crescer sem limite
-  await AsyncStorage.setItem(CONVERSA_KEY, JSON.stringify(conversa.slice(-100)));
+function tituloDe(mensagens: Mensagem[]): string {
+  const primeira = mensagens.find((m) => m.papel === "usuario")?.texto.trim() ?? "Nova conversa";
+  return primeira.length > 48 ? `${primeira.slice(0, 47)}…` : primeira;
+}
+
+/** Grava a conversa (nova ou existente) no topo da lista e devolve a lista atualizada. */
+export async function salvarConversa(conversa: Conversa): Promise<Conversa[]> {
+  const atualizada: Conversa = {
+    ...conversa,
+    titulo: tituloDe(conversa.mensagens),
+    atualizado: Date.now(),
+    // Só o fim de cada conversa, para o armazenamento não crescer sem limite
+    mensagens: conversa.mensagens.slice(-100),
+  };
+  const lista = [atualizada, ...(await listarConversas()).filter((c) => c.id !== conversa.id)].slice(0, MAX_CONVERSAS);
+  await AsyncStorage.setItem(CONVERSAS_KEY, JSON.stringify(lista));
+  await AsyncStorage.removeItem(CONVERSA_ANTIGA_KEY);
+  return lista;
+}
+
+export async function apagarConversa(id: string): Promise<Conversa[]> {
+  const lista = (await listarConversas()).filter((c) => c.id !== id);
+  await AsyncStorage.setItem(CONVERSAS_KEY, JSON.stringify(lista));
+  return lista;
 }
 
 /** No Render free o backend dorme: chamado ao abrir o app para ele acordar. Falhas são ignoradas. */

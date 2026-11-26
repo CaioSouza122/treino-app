@@ -4,8 +4,7 @@
     "strict": true,
     "skipLibCheck": true,
     "types": [
-      "node",
-      "nativewind/types"
+      "node"
     ],
     "paths": {
       "@/*": [
@@ -17,7 +16,6 @@
     "**/*.ts",
     "**/*.tsx",
     "expo-env.d.ts",
-    "nativewind-env.d.ts",
     ".expo/types/**/*.ts"
   ],
   "exclude": [

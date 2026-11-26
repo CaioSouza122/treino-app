@@ -85,6 +85,7 @@ export default function WorkoutDetailScreen() {
   }, [sessions, todaysLogs, workout, today]);
 
   const minutes = sessions.find((session) => session.minutes)?.minutes;
+  const atual = sessions.find((session) => session.id === expandedId) ?? sessions[0];
   const allDone = progress.total > 0 && progress.done === progress.total;
 
   async function toggle(session: Session, exercise: Exercise) {
@@ -141,7 +142,7 @@ export default function WorkoutDetailScreen() {
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
       <View style={styles.fill}>
         <ScreenHeader
-          title={sessions[0]?.subtitle || "Treino personalizado"}
+          title={`Plano de ${sessions.length} ${sessions.length === 1 ? "dia" : "dias"}`}
           subtitle={`Gerado pela IA · ${new Date(workout.created_at).toLocaleDateString("pt-BR")}`}
         />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -162,34 +163,47 @@ export default function WorkoutDetailScreen() {
             <TraceProgress ratio={progress.ratio} />
           </View>
 
-          {/* ── Sessões ────────────────────────────────────────────── */}
-          {sessions.map((session) => {
-            const done = session.exercises.filter((exercise) => logFor(session, exercise)).length;
-            return (
-              <SessionCard
-                key={session.id}
-                session={session}
-                done={done}
-                expanded={expandedId === session.id}
-                onPress={() => {
-                  haptic.light();
-                  setExpandedId(expandedId === session.id ? null : session.id);
-                }}
-              >
-                {session.exercises.map((exercise, index) => (
-                  <ExerciseRow
-                    key={exercise.id}
-                    index={index}
-                    exercise={exercise}
-                    log={logFor(session, exercise)}
-                    lastLoad={lastLoadBefore(logs, exercise.name, today)}
-                    onToggle={() => toggle(session, exercise)}
-                    onSaveLoad={(load) => saveLoad(session, exercise, load)}
-                  />
-                ))}
-              </SessionCard>
-            );
-          })}
+          {/* ── Dias do plano: um por vez ─────────────────────────── */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dias}>
+            {sessions.map((session) => {
+              const done = session.exercises.filter((exercise) => logFor(session, exercise)).length;
+              const ativo = session.id === atual?.id;
+              const completo = done === session.exercises.length;
+              return (
+                <Pressable
+                  key={session.id}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: ativo }}
+                  onPress={() => {
+                    haptic.light();
+                    setExpandedId(session.id);
+                  }}
+                  style={[styles.dia, ativo && styles.diaAtivo]}
+                >
+                  <Text style={[styles.diaLetra, ativo && styles.diaLetraAtiva]}>{session.label.replace(/^Treino\s+/i, "")}</Text>
+                  <Text style={[styles.diaConta, completo && styles.diaCompleto]}>
+                    {completo ? "✓" : `${done}/${session.exercises.length}`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {atual && (
+            <SessionCard session={atual} done={atual.exercises.filter((exercise) => logFor(atual, exercise)).length}>
+              {atual.exercises.map((exercise, index) => (
+                <ExerciseRow
+                  key={exercise.id}
+                  index={index}
+                  exercise={exercise}
+                  log={logFor(atual, exercise)}
+                  lastLoad={lastLoadBefore(logs, exercise.name, today)}
+                  onToggle={() => toggle(atual, exercise)}
+                  onSaveLoad={(load) => saveLoad(atual, exercise, load)}
+                />
+              ))}
+            </SessionCard>
+          )}
         </ScrollView>
 
         <PrimaryButton
@@ -213,36 +227,27 @@ function Summary({ value, unit }: { value: string; unit: string }) {
   );
 }
 
-function SessionCard({
-  session,
-  done,
-  expanded,
-  onPress,
-  children,
-}: {
-  session: Session;
-  done: number;
-  expanded: boolean;
-  onPress: () => void;
-  children: React.ReactNode;
-}) {
+function SessionCard({ session, done, children }: { session: Session; done: number; children: React.ReactNode }) {
   const ratio = session.exercises.length ? done / session.exercises.length : 0;
   return (
     <View style={styles.session}>
-      <Pressable onPress={onPress} style={({ pressed }) => [styles.sessionHead, pressed && styles.pressed]}>
-        <View style={styles.sessionTitleArea}>
-          <Label color={done === session.exercises.length ? brand.lime : brand.cyan}>{session.label}</Label>
-          <Text style={styles.sessionTitle}>{session.subtitle}</Text>
-          <Text style={styles.sessionSub}>{done}/{session.exercises.length} exercícios · {session.duration}</Text>
-        </View>
-        <MaterialIcons name={expanded ? "expand-less" : "expand-more"} color={brand.muted} size={24} />
-      </Pressable>
-      <View style={styles.trace}>
+      <View style={styles.sessionHead}>
+        <Label color={done === session.exercises.length ? brand.lime : brand.cyan}>{session.label}</Label>
+        <Text style={styles.sessionTitle}>{session.subtitle}</Text>
+        <Text style={styles.sessionSub}>
+          {done}/{session.exercises.length} exercícios feitos hoje{session.minutes ? ` · ${session.duration}` : ""}
+        </Text>
         <TraceProgress ratio={ratio} />
       </View>
-      {expanded && <View style={styles.exerciseList}>{children}</View>}
+      <View style={styles.exerciseList}>{children}</View>
     </View>
   );
+}
+
+/** "4x8-12" → ["4 séries", "8-12 reps"]; outros formatos ficam como vieram. */
+function etiquetas(prescricao: string): string[] {
+  const m = prescricao.match(/^(\d+)\s*[xX×]\s*(.+)$/);
+  return m ? [`${m[1]} séries`, `${m[2].trim()} reps`] : [prescricao];
 }
 
 /** Uma linha do checklist. Ao concluir, aparece o campo para anotar a carga usada (kg). */
@@ -280,7 +285,7 @@ function ExerciseRow({
         accessibilityRole="checkbox"
         accessibilityState={{ checked: completed }}
         onPress={onToggle}
-        style={({ pressed }) => [styles.exerciseMain, pressed && styles.pressed]}
+        style={styles.exerciseMain}
       >
         <View style={[styles.check, completed && styles.checkOn]}>
           {completed ? (
@@ -291,7 +296,13 @@ function ExerciseRow({
         </View>
         <View style={styles.exerciseText}>
           <Text style={[styles.exerciseName, completed && styles.exerciseDone]}>{exercise.name}</Text>
-          <Text style={styles.prescription}>{exercise.prescription}</Text>
+          <View style={styles.tags}>
+            {etiquetas(exercise.prescription).map((tag) => (
+              <Text key={tag} style={styles.tag}>
+                {tag}
+              </Text>
+            ))}
+          </View>
         </View>
       </Pressable>
       {completed && (
@@ -327,12 +338,17 @@ const styles = StyleSheet.create({
   overall: { gap: 10 },
   overallHead: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   overallCount: { color: brand.text, fontFamily: font.displayMedium, fontSize: 13 },
+  dias: { gap: 8 },
+  dia: { alignItems: "center", backgroundColor: brand.surface, borderColor: brand.border, borderRadius: radius.md, borderWidth: 1, gap: 2, minWidth: 58, paddingHorizontal: 12, paddingVertical: 10 },
+  diaAtivo: { backgroundColor: brand.limeSoft, borderColor: brand.lime },
+  diaLetra: { color: brand.text, fontFamily: font.display, fontSize: 20 },
+  diaLetraAtiva: { color: brand.lime },
+  diaConta: { ...type.caption, fontSize: 11 },
+  diaCompleto: { color: brand.lime },
   session: { backgroundColor: brand.surface, borderColor: brand.border, borderRadius: radius.lg, borderWidth: 1, overflow: "hidden" },
-  sessionHead: { alignItems: "center", flexDirection: "row", gap: 12, padding: 16, paddingBottom: 12 },
-  sessionTitleArea: { flex: 1, gap: 4 },
-  sessionTitle: { ...type.title, fontSize: 17 },
-  sessionSub: { ...type.caption },
-  trace: { paddingBottom: 14, paddingHorizontal: 16 },
+  sessionHead: { gap: 6, padding: 16 },
+  sessionTitle: { ...type.h2, fontSize: 20 },
+  sessionSub: { ...type.caption, marginBottom: 6 },
   exerciseList: { borderTopColor: brand.border, borderTopWidth: 1 },
   exercise: { alignItems: "center", flexDirection: "row", gap: 10, minHeight: 60, paddingHorizontal: 16, paddingVertical: 10 },
   exerciseDivider: { borderTopColor: brand.border, borderTopWidth: 1 },
@@ -343,7 +359,8 @@ const styles = StyleSheet.create({
   checkIndex: { color: brand.muted, fontFamily: font.displayMedium, fontSize: 11 },
   exerciseName: { color: brand.text, fontSize: 14.5, fontWeight: "600", lineHeight: 20 },
   exerciseDone: { color: brand.muted },
-  prescription: { color: brand.cyan, fontFamily: font.displayMedium, fontSize: 12 },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
+  tag: { borderColor: brand.cyan, borderRadius: 6, borderWidth: 1, color: brand.cyan, fontFamily: font.displayMedium, fontSize: 11.5, overflow: "hidden", paddingHorizontal: 7, paddingVertical: 2 },
   loadBox: { alignItems: "center", flexDirection: "row", gap: 6 },
   loadInput: { backgroundColor: brand.background, borderColor: brand.lime, borderRadius: radius.sm, borderWidth: 1, color: brand.text, fontFamily: font.displayMedium, fontSize: 14, height: 38, textAlign: "center", width: 64 },
   loadUnit: { ...type.label, fontSize: 10 },
